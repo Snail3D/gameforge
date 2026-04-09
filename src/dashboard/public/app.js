@@ -391,7 +391,9 @@ function updateFeature(event) {
 
 function reloadGameIframe() {
   try {
-    gameIframe.src = gameIframe.src;
+    // Force reload by adding cache-busting timestamp
+    var base = (gameIframe.src || '/game/index.html').split('?')[0];
+    gameIframe.src = base + '?t=' + Date.now();
   } catch (_) { /* cross-origin */ }
 }
 

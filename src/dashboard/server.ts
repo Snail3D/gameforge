@@ -62,6 +62,10 @@ export function startDashboard(port: number): DashboardServer {
       res.status(404).send('No game loaded yet');
       return;
     }
+    // No caching — game files change constantly during build
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     express.static(currentGameDir)(req, res, next);
   });
 
