@@ -816,8 +816,44 @@ export class Supervisor extends EventEmitter {
 
   private parsePlanResponse(content: string): BuildPlan {
     const jsonBlockMatch = /```json\s*([\s\S]*?)```/.exec(content);
-    const jsonStr = jsonBlockMatch ? jsonBlockMatch[1].trim() : content.trim();
-    const raw = JSON.parse(jsonStr) as BuildPlan;
+    let jsonStr = jsonBlockMatch ? jsonBlockMatch[1].trim() : content.trim();
+
+    // Attempt JSON repair for small models that truncate or malform output
+    let raw: BuildPlan;
+    try {
+      raw = JSON.parse(jsonStr) as BuildPlan;
+    } catch {
+      // Try to fix common issues: trailing commas, unclosed brackets, truncation
+      jsonStr = jsonStr
+        .replace(/,\s*([\]}])/g, '$1')           // Remove trailing commas
+        .replace(/\n/g, ' ')                      // Flatten newlines in strings
+        .replace(/[\x00-\x1f]/g, ' ');            // Remove control chars
+
+      // If truncated, try to close open brackets/braces
+      const openBraces = (jsonStr.match(/{/g) || []).length;
+      const closeBraces = (jsonStr.match(/}/g) || []).length;
+      const openBrackets = (jsonStr.match(/\[/g) || []).length;
+      const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+
+      // Truncate to last complete object/array
+      let lastValid = jsonStr.lastIndexOf('}');
+      if (lastValid > 0) {
+        jsonStr = jsonStr.substring(0, lastValid + 1);
+      }
+
+      // Close remaining open brackets
+      for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += ']';
+      for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += '}';
+
+      // Remove trailing commas again after truncation
+      jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+
+      try {
+        raw = JSON.parse(jsonStr) as BuildPlan;
+      } catch (e2) {
+        throw new Error(`Planner output is not valid JSON even after repair. Error: ${e2}`);
+      }
+    }
 
     // Sanitize — small model planners may omit optional fields
     raw.buildSteps = (raw.buildSteps || []).map(step => ({
