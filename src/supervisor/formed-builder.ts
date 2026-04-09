@@ -232,13 +232,32 @@ export class FormedBuilder extends EventEmitter {
       }
     }
 
-    // Also handle any non-function code (variable declarations, etc)
+    // Handle non-function code (constants, variables, event listeners)
     const nonFunctionCode = this.extractNonFunctionCode(newCode);
     if (nonFunctionCode.trim()) {
-      // Check if these lines already exist (dedup)
       const newLines = nonFunctionCode.trim().split('\n');
-      const existingLines = new Set(result.split('\n').map(l => l.trim()));
-      const uniqueNew = newLines.filter(l => l.trim() && !existingLines.has(l.trim()));
+
+      // Extract existing variable names to prevent redeclaration
+      const existingVarNames = new Set<string>();
+      const varPattern = /(?:const|let|var)\s+(\w+)\s*=/g;
+      let varMatch;
+      while ((varMatch = varPattern.exec(result)) !== null) {
+        existingVarNames.add(varMatch[1]);
+      }
+
+      // Filter out lines that redeclare existing variables
+      const existingLineSet = new Set(result.split('\n').map(l => l.trim()));
+      const uniqueNew = newLines.filter(l => {
+        const trimmed = l.trim();
+        if (!trimmed) return false;
+        // Exact duplicate line
+        if (existingLineSet.has(trimmed)) return false;
+        // Variable redeclaration (const/let/var NAME = ...)
+        const declMatch = /^(?:const|let|var)\s+(\w+)\s*=/.exec(trimmed);
+        if (declMatch && existingVarNames.has(declMatch[1])) return false;
+        return true;
+      });
+
       if (uniqueNew.length > 0) {
         result = this.insertBeforeInit(result, uniqueNew.join('\n'));
       }
