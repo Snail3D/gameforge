@@ -109,8 +109,28 @@ function handleEvent(event) {
     case 'loop_detected':
       addSystemMessage('Loop detected (attempt ' + event.recoveryAttempt + '): ' + escapeText(event.repeatedTokens).slice(0, 80), event.agent);
       break;
+    case 'request_screenshot':
+      // Server is requesting a screenshot — ask the game iframe
+      var iframe = document.getElementById('game-iframe');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage('take-screenshot', '*');
+      }
+      break;
   }
 }
+
+// Listen for screenshot-result from game iframe and relay to server
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'screenshot-result') {
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: 'screenshot-response',
+        screenshot: e.data.screenshot,
+        errors: e.data.errors || []
+      }));
+    }
+  }
+});
 
 // ── Streaming Token Handling ──
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'node:http';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,34 @@ export function startDashboard(port: number): DashboardServer {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
 
+  // Screenshot capture — dashboard client captures via iframe postMessage and sends back
+  let pendingScreenshot: { resolve: (data: any) => void; timeout: ReturnType<typeof setTimeout> } | null = null;
+
+  app.post('/api/screenshot', (_req, res) => {
+    if (pendingScreenshot) {
+      res.status(429).json({ error: 'Screenshot already pending' });
+      return;
+    }
+
+    // Ask all connected clients to take a screenshot
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'request_screenshot' }));
+      }
+    }
+
+    // Wait for response (dashboard client sends it back via WebSocket)
+    const promise = new Promise<any>((resolve) => {
+      const timeout = setTimeout(() => {
+        pendingScreenshot = null;
+        resolve({ screenshot: null, errors: [{ type: 'timeout', message: 'No screenshot response in 5s' }] });
+      }, 5000);
+      pendingScreenshot = { resolve, timeout };
+    });
+
+    promise.then(data => res.json(data));
+  });
+
   // Serve game files at /game/ — set dynamically when game dir is known
   let currentGameDir: string | null = null;
   app.use('/game', (req, res, next) => {
@@ -35,6 +63,20 @@ export function startDashboard(port: number): DashboardServer {
       return;
     }
     express.static(currentGameDir)(req, res, next);
+  });
+
+  // Handle incoming WebSocket messages — screenshot responses from dashboard clients
+  wss.on('connection', (ws) => {
+    ws.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(String(raw));
+        if (msg.type === 'screenshot-response' && pendingScreenshot) {
+          clearTimeout(pendingScreenshot.timeout);
+          pendingScreenshot.resolve(msg);
+          pendingScreenshot = null;
+        }
+      } catch { /* ignore malformed */ }
+    });
   });
 
   server.listen(port, () => {
