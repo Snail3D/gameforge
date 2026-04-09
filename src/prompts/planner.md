@@ -63,6 +63,19 @@ ALL games are HTML5/Canvas/JavaScript only:
 - requestAnimationFrame for all game loops — never while(true), never setInterval for game logic
 - Assets: inline SVG, procedural generation, or data URIs — no external CDN dependencies
 
+## Mobile Compatibility (REQUIRED)
+
+ALL games MUST work on both desktop AND mobile browsers:
+- **Touch input**: Every keyboard control must have a touch alternative (on-screen buttons, swipe gestures, or tap zones)
+- **No right-click**: Mobile has no right-click. Any action that uses right-click (e.g., flagging in Minesweeper) MUST use a toggle button or long-press instead. Add a mode toggle UI element (e.g., "Flag Mode" button) that switches between primary and secondary actions.
+- **Responsive canvas**: Canvas should scale to fit the viewport. Use CSS `max-width: 100%; height: auto;` or calculate size from `window.innerWidth`.
+- **Touch events**: Use `touchstart`/`touchmove`/`touchend` alongside mouse events, or use pointer events (`pointerdown`/`pointermove`/`pointerup`) which handle both.
+- **No hover states** for gameplay — hover doesn't exist on touch screens.
+- **Minimum tap target**: Interactive elements must be at least 44x44 pixels for touch accuracy.
+- **Viewport meta tag**: Always include `<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">` to prevent pinch zoom during gameplay.
+
+Include a step for mobile controls in every game plan. This is not optional.
+
 ## BuildPlan JSON Schema
 
 ```json
