@@ -1,0 +1,42 @@
+/* YouTube / Streaming mode overrides */
+
+body {
+  font-size: 18px;
+}
+
+.panel-left {
+  width: 55%;
+}
+
+.panel-right {
+  width: 45%;
+}
+
+.feature-list-wrap {
+  display: none;
+}
+
+.btn-pause,
+.btn-stop {
+  display: none;
+}
+
+.timer {
+  font-size: 28px;
+}
+
+.chat-msg .content {
+  font-size: 16px;
+}
+
+.chat-msg .agent-label {
+  font-size: 13px;
+}
+
+.chat-msg .meta {
+  font-size: 12px;
+}
+
+footer {
+  font-size: 14px;
+}

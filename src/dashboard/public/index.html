@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAMEFORGE</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="youtube.css" id="youtube-css" disabled>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>GAMEFORGE</h1>
+      <span id="game-name" class="game-name">Autonomous Game Factory</span>
+    </div>
+    <div class="header-center">
+      <span id="timer" class="timer">00:00:00</span>
+      <span id="mode-badge" class="mode-badge">BUILD</span>
+    </div>
+    <div class="header-right">
+      <button id="btn-yt" class="btn btn-yt" title="YouTube Mode">YT</button>
+      <button id="btn-record" class="btn btn-record" title="Record">&#9210;</button>
+      <button id="btn-pause" class="btn btn-pause" title="Pause">&#9208;</button>
+      <button id="btn-stop" class="btn btn-stop" title="Stop">&#9209;</button>
+    </div>
+  </header>
+
+  <div id="youtube-banner" class="youtube-banner" hidden>
+    snail3d.com/arcade &mdash; play the games | Built with local AI
+  </div>
+
+  <main>
+    <section class="panel-left" id="panel-left">
+      <div class="game-preview">
+        <iframe id="game-iframe" src="about:blank" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progress-bar">
+          <span id="progress-text">0%</span>
+        </div>
+      </div>
+      <div class="feature-list-wrap">
+        <h3>Features</h3>
+        <ul id="feature-list"></ul>
+      </div>
+    </section>
+
+    <section class="panel-right">
+      <div id="chat" class="chat"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Cycles: <strong id="stat-cycles">0</strong></span>
+    <span>Uptime: <strong id="stat-uptime">00:00:00</strong></span>
+    <span>Loops caught: <strong id="stat-loops">0</strong></span>
+    <span>Skipped: <strong id="stat-skipped">0</strong></span>
+    <span>GPU: <strong id="stat-gpu">0</strong> MB</span>
+    <span>Pushes: <strong id="stat-pushes">0</strong></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

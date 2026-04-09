@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAMEFORGE - Start</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --border: #222;
+      --text: #e0e0e0;
+      --text-dim: #666;
+      --accent: #00ff88;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .start-container {
+      width: 100%;
+      max-width: 640px;
+      padding: 24px;
+    }
+
+    .title {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .title h1 {
+      font-size: 36px;
+      color: var(--accent);
+      letter-spacing: 8px;
+      margin-bottom: 4px;
+    }
+
+    .title p {
+      color: var(--text-dim);
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      margin-top: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 12px;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .mode-btn {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .mode-btn:hover {
+      border-color: #444;
+    }
+
+    .mode-btn.selected {
+      border-color: var(--accent);
+      background: #0a1a10;
+    }
+
+    .mode-btn .mode-name {
+      font-size: 16px;
+      letter-spacing: 2px;
+    }
+
+    .mode-btn .mode-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      font-weight: normal;
+    }
+
+    .options-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .options-row > div {
+      flex: 1;
+    }
+
+    select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .start-btn {
+      width: 100%;
+      margin-top: 24px;
+      padding: 14px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .start-btn:hover {
+      opacity: 0.9;
+    }
+
+    .start-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="start-container">
+    <div class="title">
+      <h1>GAMEFORGE</h1>
+      <p>Autonomous Game Factory</p>
+    </div>
+
+    <label for="prompt">Game Prompt</label>
+    <textarea id="prompt" placeholder="Describe the game you want to build..."></textarea>
+
+    <label>Mode</label>
+    <div class="mode-grid">
+      <button class="mode-btn" data-mode="build" onclick="selectMode(this)">
+        <div class="mode-name">BUILD</div>
+        <div class="mode-desc">Single build cycle</div>
+      </button>
+      <button class="mode-btn" data-mode="dealers_choice" onclick="selectMode(this)">
+        <div class="mode-name">DEALER</div>
+        <div class="mode-desc">AI picks the game</div>
+      </button>
+      <button class="mode-btn" data-mode="timed" onclick="selectMode(this)">
+        <div class="mode-name">TIMED</div>
+        <div class="mode-desc">Time-limited session</div>
+      </button>
+      <button class="mode-btn" data-mode="infinite" onclick="selectMode(this)">
+        <div class="mode-name">INFINITE</div>
+        <div class="mode-desc">Continuous improvement</div>
+      </button>
+    </div>
+
+    <div class="options-row">
+      <div>
+        <label for="timer-select">Timer</label>
+        <select id="timer-select">
+          <option value="0">No limit</option>
+          <option value="900">15 minutes</option>
+          <option value="1800">30 minutes</option>
+          <option value="3600">1 hour</option>
+          <option value="7200">2 hours</option>
+        </select>
+      </div>
+      <div>
+        <label for="github-select">GitHub</label>
+        <select id="github-select">
+          <option value="">No push</option>
+          <option value="auto">Auto push</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="start-btn" id="start-btn" onclick="startForge()">START FORGING</button>
+  </div>
+
+  <script>
+    var selectedMode = null;
+
+    function selectMode(btn) {
+      document.querySelectorAll('.mode-btn').forEach(function (b) {
+        b.classList.remove('selected');
+      });
+      btn.classList.add('selected');
+      selectedMode = btn.getAttribute('data-mode');
+    }
+
+    async function startForge() {
+      var prompt = document.getElementById('prompt').value.trim();
+      if (!prompt && selectedMode !== 'dealers_choice') {
+        document.getElementById('prompt').focus();
+        return;
+      }
+      if (!selectedMode) return;
+
+      var startBtn = document.getElementById('start-btn');
+      startBtn.disabled = true;
+      startBtn.textContent = 'FORGING...';
+
+      try {
+        var res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            mode: selectedMode,
+            timerSeconds: parseInt(document.getElementById('timer-select').value, 10),
+            github: document.getElementById('github-select').value
+          })
+        });
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          startBtn.disabled = false;
+          startBtn.textContent = 'START FORGING';
+        }
+      } catch (_) {
+        startBtn.disabled = false;
+        startBtn.textContent = 'START FORGING';
+      }
+    }
+  </script>
+</body>
+</html>

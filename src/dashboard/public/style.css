@@ -1,0 +1,439 @@
+:root {
+  --bg: #0a0a0a;
+  --bg-panel: #111;
+  --bg-card: #1a1a1a;
+  --border: #222;
+  --text: #e0e0e0;
+  --text-dim: #666;
+  --accent: #00ff88;
+  --supervisor: #ffaa00;
+  --builder: #4488ff;
+  --reviewer: #aa66ff;
+  --critic: #ff6688;
+  --ghost: #445566;
+  --scout: #66ccaa;
+  --planner: #ff8844;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 18px;
+  color: var(--accent);
+  letter-spacing: 4px;
+}
+
+.game-name {
+  color: var(--text-dim);
+  margin-left: 12px;
+  font-size: 12px;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.timer {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--text);
+  letter-spacing: 2px;
+}
+
+.mode-badge {
+  background: var(--accent);
+  color: var(--bg);
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.header-right {
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.btn:hover {
+  background: var(--border);
+}
+
+.btn-yt.active {
+  background: #ff0000;
+  color: #fff;
+  border-color: #ff0000;
+}
+
+.btn-record.recording {
+  background: #cc0000;
+  color: #fff;
+  border-color: #cc0000;
+  animation: pulse-rec 1s ease-in-out infinite;
+}
+
+@keyframes pulse-rec {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* YouTube banner */
+.youtube-banner {
+  background: linear-gradient(90deg, #ff0000, #cc0000);
+  color: #fff;
+  text-align: center;
+  padding: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+/* Main layout */
+main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel-left {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.panel-right {
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Game preview */
+.game-preview {
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-card);
+  position: relative;
+}
+
+.game-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+}
+
+/* Progress bar */
+.progress-wrap {
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  height: 22px;
+  background: var(--bg-card);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: var(--accent);
+  transition: width 0.5s ease;
+  border-radius: 3px;
+}
+
+.progress-bar span {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text);
+}
+
+/* Feature list */
+.feature-list-wrap {
+  padding: 8px 12px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  max-height: 200px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+
+.feature-list-wrap h3 {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+#feature-list {
+  list-style: none;
+}
+
+#feature-list li {
+  padding: 3px 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.3s;
+}
+
+#feature-list li .icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+#feature-list li.done .icon {
+  color: var(--accent);
+}
+
+#feature-list li.done .icon::after {
+  content: '\2714';
+}
+
+#feature-list li.in-progress .icon {
+  color: #ffaa00;
+}
+
+#feature-list li.in-progress .icon::after {
+  content: '\1F528';
+}
+
+#feature-list li.pending .icon {
+  color: var(--text-dim);
+}
+
+#feature-list li.pending .icon::after {
+  content: '\25A1';
+}
+
+#feature-list li.status-change {
+  animation: glow 0.6s ease;
+}
+
+@keyframes glow {
+  0% { text-shadow: 0 0 8px var(--accent); }
+  100% { text-shadow: none; }
+}
+
+/* Chat waterfall */
+.chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-msg {
+  background: var(--bg-card);
+  border-left: 3px solid var(--text-dim);
+  padding: 6px 10px;
+  border-radius: 0 4px 4px 0;
+  animation: slideIn 0.2s ease;
+}
+
+.chat-msg.supervisor { border-left-color: var(--supervisor); }
+.chat-msg.builder    { border-left-color: var(--builder); }
+.chat-msg.reviewer   { border-left-color: var(--reviewer); }
+.chat-msg.critic     { border-left-color: var(--critic); }
+.chat-msg.ghost      { border-left-color: var(--ghost); }
+.chat-msg.scout      { border-left-color: var(--scout); }
+.chat-msg.planner    { border-left-color: var(--planner); }
+
+.chat-msg .agent-label {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.chat-msg.supervisor .agent-label { color: var(--supervisor); }
+.chat-msg.builder .agent-label    { color: var(--builder); }
+.chat-msg.reviewer .agent-label   { color: var(--reviewer); }
+.chat-msg.critic .agent-label     { color: var(--critic); }
+.chat-msg.ghost .agent-label      { color: var(--ghost); }
+.chat-msg.scout .agent-label      { color: var(--scout); }
+.chat-msg.planner .agent-label    { color: var(--planner); }
+
+.chat-msg .content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 2px 0;
+}
+
+.chat-msg .meta {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.chat-msg.streaming .content::after {
+  content: '\2588';
+  animation: blink-cursor 0.8s step-end infinite;
+  color: var(--accent);
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.chat-msg.tool-call {
+  background: var(--bg-panel);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.chat-msg.tool-call .tool-name {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.chat-msg.tool-call .tool-args {
+  color: var(--text-dim);
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 500px;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.chat-msg.screenshot img {
+  max-width: 200px;
+  border-radius: 4px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+}
+
+.chat-msg.screenshot .desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.chat-msg.ghost-msg {
+  background: #111a22;
+  border-left-color: var(--ghost);
+  font-style: italic;
+}
+
+.chat-msg.system-msg {
+  background: transparent;
+  border-left-color: var(--text-dim);
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 10px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Footer */
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 6px 16px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+footer strong {
+  color: var(--text);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333;
+}
