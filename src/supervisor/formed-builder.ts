@@ -116,61 +116,35 @@ export class FormedBuilder extends EventEmitter {
   }
 
   /**
-   * Convert a regular StepDefinition into a FormedBuildStep
-   * by decomposing the task into atomic fragments
+   * Convert a regular StepDefinition into a FormedBuildStep.
+   *
+   * Strategy: ONE fragment per file. Each fragment asks for a COMPLETE file.
+   * This avoids assembly bugs (duplicate declarations, missing context).
+   * The model gets the full task + existing file content + algorithm hints,
+   * then writes the entire file. This is what tested perfectly on E2B.
    */
   async decomposeStep(step: StepDefinition): Promise<FormedBuildStep> {
-    // Ask the model to break the step into atomic pieces
-    const decompositionPrompt = `Break this game development task into atomic code fragments.
+    const allFiles = [...step.filesToCreate, ...step.filesToModify];
 
-Task: ${step.task}
-Files to create: ${step.filesToCreate.join(', ')}
-Files to modify: ${step.filesToModify.join(', ')}
+    const fragments: CodeFragment[] = allFiles.map((file, i) => {
+      // Build a focused question for this specific file
+      let question = `${step.task}\n\n`;
+      question += `Write the COMPLETE ${file} file. Include ALL code needed — declarations, functions, everything.\n`;
+      question += `Do not write partial code. Write the full, working file from top to bottom.`;
 
-For each file, list the individual code pieces needed. Each piece should be one of:
-- A set of variable/property declarations
-- A single function or method (under 20 lines)
-- An HTML structure
-- A configuration block
-
-Output JSON array:
-[
-  {
-    "id": "unique-id",
-    "question": "Write the [specific thing]",
-    "type": "function",
-    "file": "path/to/file.js",
-    "dependsOn": ["other-id"]
-  }
-]
-
-Keep each fragment small enough that a 4B parameter model can write it perfectly in one shot. Maximum 15 lines per fragment.`;
-
-    const response = await this.client.chat(
-      this.client.buildMessages(
-        'You decompose code tasks into atomic fragments. Return ONLY a JSON array, no other text.',
-        decompositionPrompt
-      )
-    );
-
-    let fragments: CodeFragment[];
-    try {
-      const jsonMatch = response.content.match(/\[[\s\S]*\]/);
-      fragments = JSON.parse(jsonMatch?.[0] || '[]');
-    } catch {
-      // Fallback: single fragment for the whole step
-      fragments = step.filesToCreate.map((file, i) => ({
-        id: `file-${i}`,
-        question: `${step.task}\n\nWrite the complete ${file} file.`,
+      return {
+        id: `file-${i}-${file.replace(/[\/\.]/g, '-')}`,
+        question,
         type: 'full_file' as const,
         file,
-      }));
-    }
+        dependsOn: i > 0 ? [`file-${i - 1}-${allFiles[i - 1].replace(/[\/\.]/g, '-')}`] : undefined,
+      };
+    });
 
     return {
       stepId: step.stepId,
       title: step.title,
-      files: [...step.filesToCreate, ...step.filesToModify],
+      files: allFiles,
       fragments,
       encouragement: step.encouragement,
     };
@@ -186,13 +160,13 @@ Keep each fragment small enough that a 4B parameter model can write it perfectly
     parts.push(`Game step: ${step.title}`);
     parts.push(`File: ${fragment.file}`);
 
-    // Include already-collected fragments for this file
-    const priorFragments = step.fragments
-      .filter(f => f.file === fragment.file && collected[f.id])
-      .map(f => `// ${f.id}:\n${collected[f.id]}`);
+    // Include other files already written in this step (cross-file context)
+    const otherFiles = step.fragments
+      .filter(f => f.file !== fragment.file && collected[f.id])
+      .map(f => `// ${f.file}:\n${collected[f.id]}`);
 
-    if (priorFragments.length > 0) {
-      parts.push(`\nCode already written for this file:\n${priorFragments.join('\n\n')}`);
+    if (otherFiles.length > 0) {
+      parts.push(`\nOther files already written in this step:\n${otherFiles.join('\n\n')}`);
     }
 
     // Include existing file content if modifying
@@ -225,7 +199,7 @@ Keep each fragment small enough that a 4B parameter model can write it perfectly
       case 'html':
         return base + ' Output only the HTML requested.';
       case 'full_file':
-        return base + ' Output the complete file contents.';
+        return base + ' Output the COMPLETE file from first line to last line. Include all imports, declarations, functions, and initialization code. The file must work standalone — do not reference variables or functions that are not defined in this file or loaded via script tags.';
       default:
         return base;
     }
