@@ -123,7 +123,9 @@ ALL games are HTML5/Canvas/JavaScript only:
 - `filesToCreate` must list files that don't exist yet
 - `acceptanceCriteria` must be observable by looking at the running game or the code — not vague
 - Never write a step that creates more than 3 files
-- Aim for 8–20 steps total depending on game complexity
+- Aim for 12–20 steps total. MORE steps is BETTER — each step should do ONE small thing. 7 steps is too few. The Builder is a small model that works best with tiny tasks.
+- Each step should create or modify at most 1-2 files
+- Never put the entire game logic in step 1 — step 1 is ONLY the HTML canvas setup
 
 ## Scaffold Rules
 
