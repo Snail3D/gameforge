@@ -13,6 +13,7 @@ const timer = timerStr ? parseInt(timerStr, 10) : 120;
 const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
 const useFormed = args.includes('--formed') || preset === 'e4b' || preset === 'e2b';
 const useRecipe = args.includes('--recipe') || preset === 'e4b' || preset === 'e2b';
+const skipCritic = args.includes('--no-critic') || preset === 'e4b' || preset === 'e2b';
 
 const config = loadConfig({ preset });
 
@@ -24,6 +25,7 @@ const supervisor = new Supervisor({
   config, mode, userPrompt: prompt, timer,
   useFormedBuilder: useFormed,
   useRecipeGenerator: useRecipe,
+  skipCritic: skipCritic,
 });
 
 // Wire events to dashboard
@@ -72,6 +74,7 @@ console.log(`
   Preset: ${preset}
   FormedBuilder: ${useFormed ? 'ON' : 'OFF'}
   RecipeGenerator: ${useRecipe ? 'ON' : 'OFF'}
+  Critic: ${skipCritic ? 'SKIP' : 'ON'}
   Prompt: ${prompt}
   Dashboard: http://localhost:${config.dashboard.port}
 `);

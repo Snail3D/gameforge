@@ -27,7 +27,8 @@ export interface SupervisorOptions {
   userPrompt: string;
   timer?: number;
   useFormedBuilder?: boolean;
-  useRecipeGenerator?: boolean;  // Use atomic recipe generation (better for complex games on small models)
+  useRecipeGenerator?: boolean;
+  skipCritic?: boolean;  // Skip Critic visual review — pass steps after Reviewer approval only
 }
 
 export class Supervisor extends EventEmitter {
@@ -38,6 +39,7 @@ export class Supervisor extends EventEmitter {
   private running: boolean = false;
   private useFormedBuilder: boolean;
   private useRecipeGenerator: boolean;
+  private skipCritic: boolean;
 
   private logger: SessionLogger | null = null;
   private loopDetector: LoopDetector | null = null;
@@ -63,6 +65,7 @@ export class Supervisor extends EventEmitter {
     this.timer = options.timer;
     this.useFormedBuilder = options.useFormedBuilder ?? false;
     this.useRecipeGenerator = options.useRecipeGenerator ?? false;
+    this.skipCritic = options.skipCritic ?? false;
     this.modelManager = new ModelManager(this.config.ollama.host);
   }
 
@@ -484,6 +487,20 @@ export class Supervisor extends EventEmitter {
         }
       }
 
+      // If skipCritic, auto-pass after Reviewer approval
+      if (this.skipCritic) {
+        this.emitEvent({
+          type: 'step_update',
+          ts: new Date().toISOString(),
+          agent: 'supervisor',
+          model: builderModel,
+          stepId: String(step.stepId),
+          status: 'passed',
+          attempt,
+        });
+        return { stepId: step.stepId, status: 'passed', attempts: attempt };
+      }
+
       // Screenshot
       const screenshot = await captureGameScreenshot(this.gameDir, this.metaDir, step.stepId);
 
@@ -723,6 +740,20 @@ export class Supervisor extends EventEmitter {
             result: `Reviewer fixed ${fixedFiles.length} file(s)`,
           });
         }
+      }
+
+      // If skipCritic, auto-pass after Reviewer approval
+      if (this.skipCritic) {
+        this.emitEvent({
+          type: 'step_update',
+          ts: new Date().toISOString(),
+          agent: 'supervisor',
+          model: builderModel,
+          stepId: String(step.stepId),
+          status: 'passed',
+          attempt,
+        });
+        return { stepId: step.stepId, status: 'passed', attempts: attempt };
       }
 
       // Screenshot
