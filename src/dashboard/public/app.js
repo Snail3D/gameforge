@@ -48,9 +48,16 @@ function connect() {
   };
 }
 
+// ── Streaming token accumulation ──
+var streamingBubbles = {}; // keyed by agent name
+
 function handleEvent(event) {
   switch (event.type) {
+    case 'token_stream':
+      appendStreamingToken(event);
+      return;
     case 'message':
+      finalizeStreamingBubble(event.agent);
       addChatMessage(event);
       break;
     case 'tool_call':
@@ -90,6 +97,51 @@ function handleEvent(event) {
     case 'loop_detected':
       addSystemMessage('Loop detected (attempt ' + event.recoveryAttempt + '): ' + escapeText(event.repeatedTokens).slice(0, 80), event.agent);
       break;
+  }
+}
+
+// ── Streaming Token Handling ──
+
+function appendStreamingToken(event) {
+  var agent = event.agent || 'unknown';
+  var bubble = streamingBubbles[agent];
+
+  if (!bubble) {
+    // Create a new streaming bubble
+    var div = document.createElement('div');
+    div.className = 'chat-msg streaming ' + agent;
+
+    var label = document.createElement('div');
+    label.className = 'agent-label';
+    label.textContent = (AGENT_ICONS[agent] || '') + ' ' + agent.toUpperCase();
+
+    var content = document.createElement('div');
+    content.className = 'content';
+    content.textContent = '';
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = new Date(event.ts).toLocaleTimeString() + ' | streaming...';
+
+    div.appendChild(label);
+    div.appendChild(content);
+    div.appendChild(meta);
+    chat.appendChild(div);
+
+    bubble = { div: div, content: content, text: '' };
+    streamingBubbles[agent] = bubble;
+  }
+
+  bubble.text += event.token;
+  bubble.content.textContent = bubble.text;
+  autoScroll();
+}
+
+function finalizeStreamingBubble(agent) {
+  var bubble = streamingBubbles[agent];
+  if (bubble) {
+    bubble.div.classList.remove('streaming');
+    delete streamingBubbles[agent];
   }
 }
 

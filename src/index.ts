@@ -24,17 +24,11 @@ supervisor.on('event', (event) => {
 });
 
 supervisor.on('token', ({ agent, token }) => {
-  // broadcast streaming token as a minimal event
   dashboard.broadcaster.broadcast({
-    type: 'message',
+    type: 'token_stream',
     agent,
-    content: token,
-    streaming: true,
+    token,
     ts: new Date().toISOString(),
-    model: '',
-    tokensIn: 0,
-    tokensOut: 0,
-    tokPerSec: 0,
   } as any);
 });
 
