@@ -257,18 +257,25 @@ export class Supervisor extends EventEmitter {
           accumulatedOutput += token;
           this.emit('token', { agent: 'builder', token });
 
-          if (accumulatedOutput.length % 200 === 0) {
-            const loopCheck = this.loopDetector!.check(accumulatedOutput);
-            if (loopCheck.looping) {
-              this.loopsCaught++;
-              this.emitEvent({
-                type: 'loop_detected',
-                ts: new Date().toISOString(),
-                agent: 'builder',
-                model: builderModel,
-                repeatedTokens: accumulatedOutput.slice(-100),
-                recoveryAttempt: attempt,
-              });
+          // Only check for loops every 1000 chars and only on the tail
+          // to avoid false positives on normal repetitive code patterns
+          if (accumulatedOutput.length % 1000 === 0 && accumulatedOutput.length > 2000) {
+            const tail = accumulatedOutput.slice(-1500);
+            const hasCodeBlocks = tail.includes('```');
+            // Skip loop detection inside code blocks — code naturally repeats patterns
+            if (!hasCodeBlocks) {
+              const loopCheck = this.loopDetector!.check(tail);
+              if (loopCheck.looping) {
+                this.loopsCaught++;
+                this.emitEvent({
+                  type: 'loop_detected',
+                  ts: new Date().toISOString(),
+                  agent: 'builder',
+                  model: builderModel,
+                  repeatedTokens: accumulatedOutput.slice(-100),
+                  recoveryAttempt: attempt,
+                });
+              }
             }
           }
         },
