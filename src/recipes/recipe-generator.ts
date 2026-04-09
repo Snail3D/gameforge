@@ -9,6 +9,7 @@
 
 import { LLMClient } from '../llm/client.js';
 import type { BuildPlan, StepDefinition } from '../agents/types.js';
+import { EventEmitter } from 'node:events';
 
 export interface RecipeGeneratorConfig {
   client: LLMClient;
@@ -23,10 +24,11 @@ const SYSTEM_PROMPT = `You are a game design expert. Answer each question with s
 
 Respond with ONLY the answer. No preamble, no explanation, no "here's my answer:". Just the answer.`;
 
-export class RecipeGenerator {
+export class RecipeGenerator extends EventEmitter {
   private client: LLMClient;
 
   constructor(config: RecipeGeneratorConfig) {
+    super();
     this.client = config.client;
   }
 
@@ -36,7 +38,12 @@ export class RecipeGenerator {
   async generate(gamePrompt: string): Promise<BuildPlan> {
     const answers: AtomicAnswer[] = [];
 
+    let questionNum = 0;
+
     const ask = async (question: string): Promise<string> => {
+      questionNum++;
+      this.emit('question', { num: questionNum, question });
+
       const contextSoFar = answers.length > 0
         ? `\nContext from previous answers:\n${answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n')}\n\n`
         : '';
@@ -45,11 +52,23 @@ export class RecipeGenerator {
         this.client.buildMessages(
           SYSTEM_PROMPT,
           `Game: ${gamePrompt}\n${contextSoFar}${question}`
-        )
+        ),
+        {
+          onToken: (token) => this.emit('token', { agent: 'planner', token }),
+        }
       );
 
       const answer = response.content.trim();
       answers.push({ question, answer });
+
+      this.emit('answer', {
+        num: questionNum,
+        question,
+        answer: answer.substring(0, 300),
+        tokensOut: response.tokensOut,
+        tokPerSec: response.tokensOut / (response.durationMs / 1000),
+      });
+
       return answer;
     };
 

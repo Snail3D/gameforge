@@ -109,6 +109,35 @@ export class Supervisor extends EventEmitter {
         client: new LLMClient({ baseUrl: this.config.ollama.host, model: plannerModel }),
       });
 
+      // Wire recipe events to dashboard
+      generator.on('question', ({ num, question }) => {
+        this.emitEvent({
+          type: 'message',
+          ts: new Date().toISOString(),
+          agent: 'supervisor',
+          model: 'none',
+          content: `Recipe Q${num}: ${question}`,
+          tokensIn: 0, tokensOut: 0, tokPerSec: 0,
+        });
+      });
+
+      generator.on('answer', ({ num, answer, tokensOut, tokPerSec }) => {
+        this.emitEvent({
+          type: 'message',
+          ts: new Date().toISOString(),
+          agent: 'planner',
+          model: plannerModel,
+          content: answer,
+          tokensIn: 0,
+          tokensOut: tokensOut || 0,
+          tokPerSec: tokPerSec || 0,
+        });
+      });
+
+      generator.on('token', ({ agent, token }) => {
+        this.emit('token', { agent, token });
+      });
+
       const plan = await generator.generate(this.userPrompt);
 
       const sameModel = plannerModel === builderModel;
