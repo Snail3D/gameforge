@@ -1,12 +1,11 @@
 /**
  * FormedBuilder — Incremental code generation for small models.
  *
- * Instead of rewriting entire files, each step ADDS code to existing files.
- * Step 1: creates the base files
- * Step 2+: reads existing file, asks model to write ONLY the new function/code,
- *          then appends it before the final draw()/gameLoop() call.
- *
- * This prevents the "rewrite wipes good code" problem.
+ * Architecture:
+ * - Step 1 creates index.html + game.js skeleton with section markers
+ * - Step 2+ appends new code into the correct section
+ * - Before appending, existing functions with same name are REPLACED, not duplicated
+ * - game.js always ends with an initialization block that calls setup + draw
  */
 
 import { LLMClient } from '../llm/client.js';
@@ -39,9 +38,9 @@ export interface FormedBuilderConfig {
   temperature?: number;
 }
 
-const SYSTEM_FULL = 'You write clean, working JavaScript/HTML game code. Respond with ONLY the code, no explanation, no markdown fences. Output the COMPLETE file from first line to last line. The file must work standalone.';
+const SYSTEM_FULL = 'You write clean, working JavaScript/HTML game code. Respond with ONLY the code, no explanation, no markdown fences. Output the COMPLETE file from first line to last line.';
 
-const SYSTEM_APPEND = 'You write clean, working JavaScript game code. You are ADDING new code to an existing file. Write ONLY the new functions/variables needed for this step. Do NOT rewrite existing code. Do NOT include code that already exists. Just the new additions. No markdown fences, no explanation.';
+const SYSTEM_APPEND = 'You write clean, working JavaScript game code. You are ADDING new code to an existing file. Write ONLY the new functions and variables needed. Do NOT include any functions that already exist in the file — they will be shown to you. Do NOT include canvas setup, constants, or initialization code that already exists. Just write the NEW functions. No markdown fences, no explanation, no duplicate code.';
 
 export class FormedBuilder extends EventEmitter {
   private client: LLMClient;
@@ -84,7 +83,7 @@ export class FormedBuilder extends EventEmitter {
         { onToken: (token) => this.emit('token', { agent: 'builder', token }) }
       );
 
-      const extracted = this.extractAnswer(response.content, fragment.type);
+      const extracted = this.extractAnswer(response.content);
       collected[fragment.id] = extracted;
 
       this.emit('fragment_done', {
@@ -102,10 +101,8 @@ export class FormedBuilder extends EventEmitter {
       if (fileFragments.length === 0) continue;
 
       if (fileFragments[0].type === 'full_file' || fileFragments[0].type === 'html') {
-        // Step 1: write complete file
         files[fileName] = collected[fileFragments[0].id] || '';
       } else if (fileFragments[0].type === 'append') {
-        // Step 2+: read existing, append new code
         let existing = '';
         try { existing = this.fileTools.readFile(fileName); } catch { /* new file */ }
 
@@ -114,7 +111,11 @@ export class FormedBuilder extends EventEmitter {
           .filter(Boolean)
           .join('\n\n');
 
-        files[fileName] = existing ? this.insertCode(existing, newCode) : newCode;
+        if (existing) {
+          files[fileName] = this.mergeCode(existing, newCode);
+        } else {
+          files[fileName] = newCode;
+        }
       } else {
         files[fileName] = fileFragments
           .map(f => collected[f.id])
@@ -123,23 +124,25 @@ export class FormedBuilder extends EventEmitter {
       }
     }
 
-    // Backup existing files before writing
+    // Backup and write
     for (const [path, content] of Object.entries(files)) {
       try {
         const existing = this.fileTools.readFile(path);
         this.fileTools.writeFile(path + '.backup', existing);
       } catch { /* no existing file */ }
-      this.fileTools.writeFile(path, content);
+
+      // Ensure game.js always ends with init call
+      let finalContent = content;
+      if (path.endsWith('.js')) {
+        finalContent = this.ensureInitCall(finalContent);
+      }
+
+      this.fileTools.writeFile(path, finalContent);
     }
 
     return { files, success: Object.keys(files).length > 0, fragments: collected };
   }
 
-  /**
-   * Decompose a step into fragments.
-   * Step 1 (filesToCreate): write complete files
-   * Step 2+ (filesToModify): append new code to existing files
-   */
   async decomposeStep(step: StepDefinition): Promise<FormedBuildStep> {
     const creates = step.filesToCreate || [];
     const modifies = step.filesToModify || [];
@@ -164,7 +167,7 @@ export class FormedBuilder extends EventEmitter {
     for (const file of modifies) {
       fragments.push({
         id: 'append-' + file.replace(/[\/\.]/g, '-'),
-        question: step.task + '\n\nWrite ONLY the new code needed for this step. Do NOT rewrite existing functions. Just the new additions.',
+        question: step.task + '\n\nWrite ONLY the new functions needed. Do NOT rewrite functions that already exist.',
         type: 'append',
         file,
       });
@@ -180,30 +183,164 @@ export class FormedBuilder extends EventEmitter {
   }
 
   /**
-   * Insert new code before the draw/gameLoop function.
-   * New functions get defined before they're called.
+   * Merge new code into existing file.
+   * - Extract function names from new code
+   * - If a function already exists in the file, REPLACE it
+   * - If it's new, INSERT it before the init block at the end
+   * - Dedup any exact duplicate lines
    */
-  private insertCode(existing: string, newCode: string): string {
-    const insertPoints = [
-      /^function\s+draw\s*\(/m,
-      /^function\s+render\s*\(/m,
-      /^function\s+gameLoop\s*\(/m,
-      /^function\s+update\s*\(/m,
-      /^\/\/\s*---\s*Game\s*Loop/im,
-      /^\/\/\s*---\s*Draw/im,
-      /^\/\/\s*---\s*Render/im,
-    ];
+  private mergeCode(existing: string, newCode: string): string {
+    // Extract function definitions from new code
+    const newFunctions = this.extractFunctions(newCode);
+    let result = existing;
 
-    for (const pattern of insertPoints) {
-      const match = pattern.exec(existing);
-      if (match && match.index > 0) {
-        const before = existing.substring(0, match.index);
-        const after = existing.substring(match.index);
-        return before + '\n// --- Added by step ---\n' + newCode + '\n\n' + after;
+    for (const { name, fullText } of newFunctions) {
+      // Check if function already exists in the file
+      const existingPattern = new RegExp(
+        'function\\s+' + this.escapeRegex(name) + '\\s*\\([^)]*\\)\\s*\\{',
+        'm'
+      );
+      const match = existingPattern.exec(result);
+
+      if (match) {
+        // Replace the existing function with the new one
+        const start = match.index;
+        const end = this.findMatchingBrace(result, start + match[0].indexOf('{'));
+        if (end > start) {
+          result = result.substring(0, start) + fullText + result.substring(end + 1);
+        }
+      } else {
+        // New function — insert before the init block
+        result = this.insertBeforeInit(result, fullText);
       }
     }
 
-    return existing + '\n\n// --- Added by step ---\n' + newCode;
+    // Also handle any non-function code (variable declarations, etc)
+    const nonFunctionCode = this.extractNonFunctionCode(newCode);
+    if (nonFunctionCode.trim()) {
+      // Check if these lines already exist (dedup)
+      const newLines = nonFunctionCode.trim().split('\n');
+      const existingLines = new Set(result.split('\n').map(l => l.trim()));
+      const uniqueNew = newLines.filter(l => l.trim() && !existingLines.has(l.trim()));
+      if (uniqueNew.length > 0) {
+        result = this.insertBeforeInit(result, uniqueNew.join('\n'));
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Extract individual function definitions from code
+   */
+  private extractFunctions(code: string): Array<{ name: string; fullText: string }> {
+    const functions: Array<{ name: string; fullText: string }> = [];
+    const pattern = /function\s+(\w+)\s*\([^)]*\)\s*\{/g;
+    let match;
+
+    while ((match = pattern.exec(code)) !== null) {
+      const name = match[1];
+      const start = match.index;
+      const braceStart = start + match[0].indexOf('{');
+      const end = this.findMatchingBrace(code, braceStart);
+      if (end > start) {
+        functions.push({ name, fullText: code.substring(start, end + 1) });
+      }
+    }
+
+    return functions;
+  }
+
+  /**
+   * Extract non-function code (constants, variable declarations, event listeners)
+   */
+  private extractNonFunctionCode(code: string): string {
+    const functions = this.extractFunctions(code);
+    let remaining = code;
+
+    // Remove function bodies from code to get the rest
+    for (const { fullText } of functions.reverse()) {
+      remaining = remaining.replace(fullText, '');
+    }
+
+    // Remove comments that are just markers
+    remaining = remaining.replace(/\/\/\s*---\s*Added by step\s*---/g, '');
+
+    return remaining.trim();
+  }
+
+  /**
+   * Find the matching closing brace for an opening brace
+   */
+  private findMatchingBrace(code: string, openPos: number): number {
+    let depth = 0;
+    for (let i = openPos; i < code.length; i++) {
+      if (code[i] === '{') depth++;
+      else if (code[i] === '}') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Insert code before the initialization block at the end of the file.
+   * The init block is identified by comments or common init patterns.
+   */
+  private insertBeforeInit(existing: string, newCode: string): string {
+    // Look for init markers at the end of the file
+    const initPatterns = [
+      /\/\/\s*={3,}\s*INIT/im,
+      /\/\/\s*---\s*INIT/im,
+      /initializeGame\s*\(\s*\)\s*;/m,
+      /drawBoard\s*\(\s*\)\s*;/m,
+      /drawState\s*\(\s*\)\s*;/m,
+      /gameLoop\s*\(\s*\)\s*;/m,
+      /setInterval\s*\(/m,
+      /requestAnimationFrame\s*\(/m,
+    ];
+
+    for (const pattern of initPatterns) {
+      const match = pattern.exec(existing);
+      if (match) {
+        const pos = match.index;
+        const before = existing.substring(0, pos);
+        const after = existing.substring(pos);
+        return before + '\n' + newCode + '\n\n' + after;
+      }
+    }
+
+    // No init block found — append before the last line
+    return existing + '\n\n' + newCode;
+  }
+
+  /**
+   * Ensure game.js ends with initialization calls.
+   * If no init call exists at the bottom, add one.
+   */
+  private ensureInitCall(code: string): string {
+    const lines = code.trimEnd().split('\n');
+    const lastLines = lines.slice(-5).join('\n');
+
+    // Check if there's already an init call near the end
+    const hasInit = /initializeGame\s*\(\)|drawBoard\s*\(\)|drawState\s*\(\)|gameLoop\s*\(\)|setInterval|requestAnimationFrame/.test(lastLines);
+
+    if (hasInit) return code;
+
+    // Find what init functions exist in the code
+    const initCalls: string[] = [];
+    if (/function\s+initializeGame\s*\(/.test(code)) initCalls.push('initializeGame();');
+    if (/function\s+setupGame\s*\(/.test(code)) initCalls.push('setupGame();');
+    if (/function\s+init\s*\(/.test(code)) initCalls.push('init();');
+    if (/function\s+drawBoard\s*\(/.test(code)) initCalls.push('drawBoard();');
+    if (/function\s+drawState\s*\(/.test(code)) initCalls.push('drawState();');
+    if (/function\s+draw\s*\(/.test(code)) initCalls.push('draw();');
+    if (/function\s+render\s*\(/.test(code)) initCalls.push('render();');
+
+    if (initCalls.length === 0) return code;
+
+    return code + '\n\n// === START GAME ===\n' + initCalls.join('\n') + '\n';
   }
 
   private buildFragmentContext(
@@ -219,7 +356,14 @@ export class FormedBuilder extends EventEmitter {
     if (fragment.type === 'append') {
       try {
         const existing = this.fileTools.readFile(fragment.file);
-        parts.push('\nExisting file content (DO NOT rewrite this, only add new code):\n```\n' + existing + '\n```');
+
+        // Show existing function names so the model knows what NOT to rewrite
+        const existingFuncs = this.extractFunctions(existing).map(f => f.name);
+        if (existingFuncs.length > 0) {
+          parts.push('\nFunctions that ALREADY EXIST (do NOT rewrite these): ' + existingFuncs.join(', '));
+        }
+
+        parts.push('\nCurrent file content:\n```\n' + existing + '\n```');
       } catch {
         parts.push('\nFile does not exist yet.');
       }
@@ -235,14 +379,10 @@ export class FormedBuilder extends EventEmitter {
 
     parts.push('\n' + fragment.question);
 
-    if (fragment.infer_from) {
-      parts.push('\nHint: ' + fragment.infer_from);
-    }
-
     return parts.join('\n');
   }
 
-  private extractAnswer(content: string, _type: string): string {
+  private extractAnswer(content: string): string {
     let cleaned = content.trim();
     const fenceMatch = cleaned.match(/```(?:javascript|js|html|css)?\n?([\s\S]*?)```/);
     if (fenceMatch) {
@@ -251,11 +391,7 @@ export class FormedBuilder extends EventEmitter {
     return cleaned;
   }
 
-  private applyTemplate(template: string, collected: Record<string, string>): string {
-    let result = template;
-    for (const [key, value] of Object.entries(collected)) {
-      result = result.replace(new RegExp('\\{\\{' + key + '\\}\\}', 'g'), value);
-    }
-    return result;
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

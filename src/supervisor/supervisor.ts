@@ -162,6 +162,9 @@ export class Supervisor extends EventEmitter {
 
       this.logger = new SessionLogger(this.metaDir, gameName);
 
+      // Emit game_ready so the dashboard can load the iframe
+      this.emit('game_ready', this.gameDir);
+
       this.emitEvent({
         type: 'message',
         ts: new Date().toISOString(),
@@ -240,6 +243,9 @@ export class Supervisor extends EventEmitter {
     }
 
     this.logger = new SessionLogger(this.metaDir, gameName);
+
+    // Emit game_ready so the dashboard can load the iframe
+    this.emit('game_ready', this.gameDir);
 
     return plan;
   }

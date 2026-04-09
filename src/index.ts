@@ -28,27 +28,22 @@ const supervisor = new Supervisor({
   skipCritic: skipCritic,
 });
 
-// Wire events to dashboard
-supervisor.on('event', (event: any) => {
-  // When game directory is created, start serving it and tell the frontend
-  if (event.type === 'step_assign' && !gameReady) {
-    const gameDir = supervisor.getGameDir();
-    if (gameDir) {
-      dashboard.serveGameDir(gameDir);
-      dashboard.broadcaster.broadcast({
-        type: 'game_ready',
-        ts: new Date().toISOString(),
-        agent: 'supervisor',
-        model: 'none',
-        url: '/game/index.html',
-      } as any);
-      gameReady = true;
-    }
-  }
-  dashboard.broadcaster.broadcast(event);
+// When game directory is created, serve it and tell the dashboard
+supervisor.on('game_ready', (gameDir: string) => {
+  dashboard.serveGameDir(gameDir);
+  dashboard.broadcaster.broadcast({
+    type: 'game_ready',
+    ts: new Date().toISOString(),
+    agent: 'supervisor',
+    model: 'none',
+    url: '/game/index.html',
+  } as any);
 });
 
-let gameReady = false;
+// Wire all events to dashboard
+supervisor.on('event', (event: any) => {
+  dashboard.broadcaster.broadcast(event);
+});
 
 supervisor.on('token', ({ agent, token }) => {
   dashboard.broadcaster.broadcast({
