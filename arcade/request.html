@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Request a Game &mdash; SNAIL ARCADE</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="request-wrap">
+    <h1>REQUEST A GAME</h1>
+
+    <form id="requestForm" action="https://formspree.io/f/FORMSPREE_ID" method="POST" novalidate>
+
+      <div class="form-group">
+        <label for="gameIdea">What game do you want us to build? *</label>
+        <textarea id="gameIdea" name="gameIdea" required placeholder="Describe the game idea..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="yourName">Your name (optional)</label>
+        <input id="yourName" name="yourName" type="text" placeholder="SnailFan42" autocomplete="name" />
+      </div>
+
+      <div class="form-group">
+        <label for="yourEmail">Your email &mdash; we'll notify when it's built (optional)</label>
+        <input id="yourEmail" name="yourEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+
+      <button class="form-submit" id="submitBtn" type="submit">SUBMIT REQUEST</button>
+
+    </form>
+
+    <div class="success-msg" id="successMsg" role="alert">
+      Request received! We'll get to work on it. If you left an email, we'll ping you when it's live.
+    </div>
+
+    <a href="squeeze.html" class="back-link">&larr; Back to Snail Arcade</a>
+  </div>
+
+  <script>
+    document.getElementById('requestForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const form = e.target;
+      const submitBtn = document.getElementById('submitBtn');
+      const successMsg = document.getElementById('successMsg');
+
+      const idea = form.querySelector('#gameIdea').value.trim();
+      if (!idea) {
+        form.querySelector('#gameIdea').focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'SENDING...';
+
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { Accept: 'application/json' },
+      })
+        .then(function(res) {
+          if (res.ok) {
+            form.style.display = 'none';
+            successMsg.style.display = 'block';
+          } else {
+            return res.json().then(function(data) {
+              throw new Error(data.error || 'Submission failed');
+            });
+          }
+        })
+        .catch(function(err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'SUBMIT REQUEST';
+          alert('Something went wrong: ' + err.message + '. Please try again.');
+        });
+    });
+  </script>
+
+</body>
+</html>

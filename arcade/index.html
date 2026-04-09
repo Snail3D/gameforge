@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNAIL ARCADE</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <h1>SNAIL ARCADE</h1>
+    <p class="subtitle">Browser games by SnailKing &mdash; built by AI, played by you</p>
+  </header>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <input
+        class="search-input"
+        id="searchInput"
+        type="text"
+        placeholder="Search games..."
+        aria-label="Search games"
+        autocomplete="off"
+      />
+    </div>
+    <div class="sort-buttons">
+      <button class="sort-btn active" data-sort="newest">Newest</button>
+      <button class="sort-btn" data-sort="popular">Popular</button>
+    </div>
+  </div>
+
+  <div class="tag-filters" id="tagFilters">
+    <!-- populated by JS -->
+  </div>
+
+  <div class="games-grid" id="gamesGrid">
+    <!-- populated by JS -->
+  </div>
+
+  <script>
+    const MANIFEST = 'games-index.json';
+
+    let allGames = [];
+    let activeTag = 'All';
+    let activeSort = 'newest';
+    let searchQuery = '';
+
+    // ── Fetch manifest ──────────────────────────────────────
+    async function loadGames() {
+      try {
+        const res = await fetch(MANIFEST);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        allGames = Array.isArray(data) ? data : (data.games || []);
+      } catch (_) {
+        allGames = [];
+      }
+      buildTagFilters();
+      render();
+    }
+
+    // ── Build tag filter chips ───────────────────────────────
+    function buildTagFilters() {
+      const tagSet = new Set(['All']);
+      allGames.forEach(function(g) {
+        if (g.genre) tagSet.add(g.genre);
+        (g.tags || []).forEach(function(t) { tagSet.add(t); });
+      });
+
+      const container = document.getElementById('tagFilters');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      tagSet.forEach(function(tag) {
+        const btn = document.createElement('button');
+        btn.className = 'tag-chip' + (tag === activeTag ? ' active' : '');
+        btn.textContent = tag;
+        btn.addEventListener('click', function() {
+          activeTag = tag;
+          document.querySelectorAll('.tag-chip').forEach(function(c) {
+            c.classList.remove('active');
+          });
+          btn.classList.add('active');
+          render();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    // ── Filter + sort ────────────────────────────────────────
+    function getFiltered() {
+      const q = searchQuery.trim().toLowerCase();
+
+      return allGames
+        .filter(function(g) {
+          if (activeTag !== 'All') {
+            if (g.genre !== activeTag && !(g.tags || []).includes(activeTag)) return false;
+          }
+          if (q) {
+            const haystack = [g.name || '', g.description || '', g.genre || '']
+              .concat(g.tags || [])
+              .join(' ')
+              .toLowerCase();
+            if (haystack.indexOf(q) === -1) return false;
+          }
+          return true;
+        })
+        .sort(function(a, b) {
+          if (activeSort === 'popular') return (b.plays || 0) - (a.plays || 0);
+          const ta = a.created ? new Date(a.created).getTime() : 0;
+          const tb = b.created ? new Date(b.created).getTime() : 0;
+          return tb - ta;
+        });
+    }
+
+    // ── DOM helpers ──────────────────────────────────────────
+    function el(tag, opts) {
+      const node = document.createElement(tag);
+      if (opts) {
+        if (opts.cls) node.className = opts.cls;
+        if (opts.text != null) node.textContent = opts.text;
+        if (opts.href) node.href = opts.href;
+        if (opts.src) node.src = opts.src;
+        if (opts.alt != null) node.alt = opts.alt;
+        if (opts.loading) node.loading = opts.loading;
+        if (opts.attr) Object.entries(opts.attr).forEach(function(pair) { node.setAttribute(pair[0], pair[1]); });
+      }
+      return node;
+    }
+
+    function buildCard(g) {
+      const article = el('article', { cls: 'game-card' });
+      const link = el('a', { href: g.url || '#' });
+      if (!g.url) link.setAttribute('aria-disabled', 'true');
+
+      // Thumbnail
+      if (g.thumbnail) {
+        const img = el('img', { cls: 'card-thumb', src: g.thumbnail, alt: g.name || '', loading: 'lazy' });
+        link.appendChild(img);
+      } else {
+        const ph = el('div', { cls: 'card-thumb-placeholder', text: '\uD83C\uDFAE' });
+        link.appendChild(ph);
+      }
+
+      // Body
+      const body = el('div', { cls: 'card-body' });
+
+      body.appendChild(el('div', { cls: 'card-title', text: g.name || 'Untitled' }));
+      body.appendChild(el('div', { cls: 'card-desc', text: g.description || '' }));
+
+      // Tags
+      const allTags = [g.genre].concat(g.tags || []).filter(Boolean);
+      if (allTags.length) {
+        const tagsRow = el('div', { cls: 'card-tags' });
+        allTags.forEach(function(t) {
+          tagsRow.appendChild(el('span', { cls: 'card-tag', text: t }));
+        });
+        body.appendChild(tagsRow);
+      }
+
+      // Stats
+      const statParts = [];
+      if (g.plays != null) statParts.push(Number(g.plays).toLocaleString() + ' plays');
+      if (g.created) {
+        const d = new Date(g.created);
+        if (!isNaN(d.getTime())) {
+          statParts.push('added ' + d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
+        }
+      }
+      if (g.buildTime) statParts.push('built in ' + g.buildTime);
+      if (statParts.length) {
+        body.appendChild(el('div', { cls: 'card-stats', text: statParts.join(' \u00B7 ') }));
+      }
+
+      link.appendChild(body);
+      article.appendChild(link);
+      return article;
+    }
+
+    // ── Render cards ─────────────────────────────────────────
+    function render() {
+      const grid = document.getElementById('gamesGrid');
+      while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+      const games = getFiltered();
+      if (games.length === 0) {
+        const empty = el('div', { cls: 'empty-state', text: 'No games found. Try a different search.' });
+        grid.appendChild(empty);
+        return;
+      }
+
+      games.forEach(function(g) {
+        grid.appendChild(buildCard(g));
+      });
+    }
+
+    // ── Event listeners ──────────────────────────────────────
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      searchQuery = e.target.value;
+      render();
+    });
+
+    document.querySelectorAll('.sort-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        activeSort = btn.dataset.sort;
+        document.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        render();
+      });
+    });
+
+    // ── Boot ─────────────────────────────────────────────────
+    loadGames();
+  </script>
+
+</body>
+</html>
