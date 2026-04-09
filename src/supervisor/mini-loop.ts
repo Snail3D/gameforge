@@ -50,7 +50,11 @@ export class MiniLoop {
     return { passed, reason, feedback: response, featureUpdates };
   }
 
-  parseReviewerVerdict(response: string): boolean {
-    return response.trimStart().toLowerCase().startsWith('pass');
+  parseReviewerVerdict(response: string): { passed: boolean; hasFixedCode: boolean } {
+    const trimmed = response.trimStart().toLowerCase();
+    if (trimmed.startsWith('pass_with_fixes') || trimmed.startsWith('pass with fixes')) {
+      return { passed: true, hasFixedCode: true };
+    }
+    return { passed: trimmed.startsWith('pass'), hasFixedCode: false };
   }
 }

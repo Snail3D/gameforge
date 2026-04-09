@@ -375,11 +375,27 @@ export class Supervisor extends EventEmitter {
         tokPerSec: reviewerResponse.tokensOut / (reviewerResponse.durationMs / 1000),
       });
 
-      const reviewPassed = this.miniLoop!.parseReviewerVerdict(reviewerResponse.content);
-      if (!reviewPassed) {
+      const reviewResult = this.miniLoop!.parseReviewerVerdict(reviewerResponse.content);
+      if (!reviewResult.passed) {
         criticFeedback = reviewerResponse.content;
         attempts.push({ attempt, criticFeedback });
         continue;
+      }
+
+      // If Reviewer fixed code inline, extract and save those fixes
+      if (reviewResult.hasFixedCode) {
+        const fixedFiles = this.extractAndSaveCode(reviewerResponse.content);
+        if (fixedFiles.length > 0) {
+          this.emitEvent({
+            type: 'tool_call',
+            ts: new Date().toISOString(),
+            agent: 'reviewer',
+            model: reviewerModel,
+            tool: 'write_file',
+            args: { files: fixedFiles },
+            result: `Reviewer fixed ${fixedFiles.length} file(s): ${fixedFiles.join(', ')}`,
+          });
+        }
       }
 
       // Screenshot

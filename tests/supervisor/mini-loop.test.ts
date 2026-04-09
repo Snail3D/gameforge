@@ -55,10 +55,11 @@ describe('MiniLoop', () => {
     expect(verdict.featureUpdates).toEqual([]);
   });
 
-  it('parseReviewerVerdict returns true for PASS response and false for FAIL', () => {
-    expect(miniLoop.parseReviewerVerdict('PASS: Code looks good.')).toBe(true);
-    expect(miniLoop.parseReviewerVerdict('pass: looks fine')).toBe(true);
-    expect(miniLoop.parseReviewerVerdict('FAIL: Missing semicolon')).toBe(false);
-    expect(miniLoop.parseReviewerVerdict('  PASS after trim')).toBe(true);
+  it('parseReviewerVerdict returns passed for PASS and PASS_WITH_FIXES', () => {
+    expect(miniLoop.parseReviewerVerdict('PASS: Code looks good.').passed).toBe(true);
+    expect(miniLoop.parseReviewerVerdict('PASS: Code looks good.').hasFixedCode).toBe(false);
+    expect(miniLoop.parseReviewerVerdict('PASS_WITH_FIXES: Fixed missing semicolon').passed).toBe(true);
+    expect(miniLoop.parseReviewerVerdict('PASS_WITH_FIXES: Fixed missing semicolon').hasFixedCode).toBe(true);
+    expect(miniLoop.parseReviewerVerdict('FAIL: Missing semicolon').passed).toBe(false);
   });
 });
