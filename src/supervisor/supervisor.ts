@@ -151,7 +151,11 @@ export class Supervisor extends EventEmitter {
     const builderModel = this.config.ollama.models.builder;
     await this.modelManager.loadModel(builderModel);
 
-    this.ghost = new Ghost(plan.ghost as GhostDatabase);
+    this.ghost = new Ghost(plan.ghost as GhostDatabase, {
+      baseUrl: this.config.ollama.host,
+      model: this.config.ollama.models.scout,  // E4B for smart answers
+      gameDesign: plan.gameDesign,
+    });
     this.loopDetector = new LoopDetector();
     this.miniLoop = new MiniLoop();
     this.feeder = new StepFeeder(plan.buildSteps);
@@ -277,14 +281,17 @@ export class Supervisor extends EventEmitter {
         tokPerSec: builderResponse.tokensOut / (builderResponse.durationMs / 1000),
       });
 
-      // Ghost interventions
+      // Ghost interventions — smart path uses E4B for unmatched questions
       if (this.ghost!.isQuestion(builderResponse.content)) {
-        const answer = this.ghost!.answerQuestion(builderResponse.content);
+        const answer = await this.ghost!.answerQuestionSmart(
+          builderResponse.content,
+          step.title,
+        );
         this.emitEvent({
           type: 'ghost_intervention',
           ts: new Date().toISOString(),
           agent: 'ghost',
-          model: builderModel,
+          model: answer.entryId === 'smart-ghost' ? this.config.ollama.models.scout : 'none',
           trigger: 'question',
           pattern: 'question_detected',
           response: answer.response,

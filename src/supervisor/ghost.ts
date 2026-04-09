@@ -28,11 +28,19 @@ export interface WeaknessMatch {
   prevention: string;
 }
 
+export interface SmartGhostConfig {
+  baseUrl: string;
+  model: string;  // e.g. 'gemma4:e4b'
+  gameDesign: string;  // the full PRD
+}
+
 export class Ghost {
   private db: GhostDatabase;
+  private smartConfig: SmartGhostConfig | null = null;
 
-  constructor(db: GhostDatabase) {
+  constructor(db: GhostDatabase, smartConfig?: SmartGhostConfig) {
     this.db = db;
+    this.smartConfig = smartConfig || null;
   }
 
   isQuestion(text: string): boolean {
@@ -56,7 +64,53 @@ export class Ghost {
         }
       }
     }
-    return { response: 'Proceed with your best judgment based on the acceptance criteria.' };
+    // No match in lookup table — will need smart fallback
+    return { response: '', entryId: undefined, needsSmart: true } as GhostAnswer;
+  }
+
+  async answerQuestionSmart(question: string, stepContext: string): Promise<GhostAnswer> {
+    // Fast path: try lookup table first
+    const fast = this.answerQuestion(question);
+    if (!(fast as any).needsSmart) return fast;
+
+    // Smart path: use E4B to answer from PRD context
+    if (!this.smartConfig) {
+      return { response: 'Proceed with your best judgment based on the acceptance criteria.' };
+    }
+
+    try {
+      const res = await fetch(`${this.smartConfig.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.smartConfig.model,
+          messages: [
+            {
+              role: 'system',
+              content: `You are a helpful assistant answering questions from a game developer. You know the game design document inside and out. Answer concisely and specifically — no filler, just the answer they need to keep coding.
+
+Game Design:
+${this.smartConfig.gameDesign.substring(0, 4000)}`,
+            },
+            {
+              role: 'user',
+              content: `I'm working on: ${stepContext}\n\nMy question: ${question}`,
+            },
+          ],
+          stream: false,
+        }),
+      });
+
+      if (!res.ok) {
+        return { response: 'Proceed with your best judgment based on the acceptance criteria.' };
+      }
+
+      const data = await res.json() as any;
+      const answer = data.choices?.[0]?.message?.content || '';
+      return { response: answer, entryId: 'smart-ghost' };
+    } catch {
+      return { response: 'Proceed with your best judgment based on the acceptance criteria.' };
+    }
   }
 
   checkWeakness(output: string): WeaknessMatch | null {

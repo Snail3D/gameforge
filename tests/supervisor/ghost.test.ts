@@ -25,9 +25,14 @@ describe('Ghost', () => {
     expect(answer.response).toBe('Use the fractional part of the ray hit position as the U coordinate.');
   });
 
-  it('returns default answer for unmatched question', () => {
+  it('flags unmatched questions for smart fallback', () => {
     const answer = ghost.answerQuestion('What color should the sky be?');
     expect(answer.entryId).toBeUndefined();
+    expect((answer as any).needsSmart).toBe(true);
+  });
+
+  it('smart fallback returns answer when no smart config', async () => {
+    const answer = await ghost.answerQuestionSmart('What color should the sky be?', 'step 1');
     expect(answer.response).toContain('best judgment');
   });
 
