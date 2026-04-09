@@ -29,6 +29,30 @@ Bad example (code-only steps fail Critic review):
 2. Render enemy on canvas
 3. Add movement logic ← CRITIC CAN'T SEE THIS WITHOUT RENDERING
 
+## Spoon-Feed Hard Steps
+
+The Builder is a 26B model. It can follow specific instructions perfectly but it CANNOT derive algorithms, physics formulas, or geometry math on its own. For any step involving collision detection, physics, AI logic, pathfinding, trigonometry, or similar — you MUST include the exact algorithm or pseudocode in the step's `task` field.
+
+Good example (Builder succeeds):
+```
+"task": "Add ball-paddle collision detection using AABB overlap. The check for the left paddle is: if (ball.x - ball.radius <= paddle.x + paddle.width && ball.y >= paddle.y && ball.y <= paddle.y + paddle.height) then reverse ball.dx (multiply by -1). Do the same check for the right paddle using ball.x + ball.radius >= paddle.x. Add a small speed increase (multiply ball.dx by 1.05) on each paddle hit to make the game progressively harder."
+```
+
+Bad example (Builder fails 3 times and skips):
+```
+"task": "Detect when the ball hits a paddle and bounce it."
+```
+
+The Planner is the big brain. The Builder is the fast hands. Write the algorithm, let the Builder type it. This applies to:
+- Collision detection (AABB, circle-rect, point-in-rect)
+- Physics (velocity, acceleration, friction, gravity)
+- AI behavior (follow target, patrol, chase/flee)
+- Trigonometry (angles, rotation, raycasting)
+- State machines (game states, enemy states)
+- Scoring logic (when to award points, win conditions)
+
+Also pre-load these algorithms into the ghost.json `ghostEntries` so if the Builder asks questions, the Ghost can feed it the answer immediately.
+
 ## Platform Constraints
 
 ALL games are HTML5/Canvas/JavaScript only:
