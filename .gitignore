@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.key
+*.pem
+config.local.*
+games/*/_meta/screenshots/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

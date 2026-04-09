@@ -1,0 +1,29 @@
+{
+  "name": "gameforge",
+  "version": "0.1.0",
+  "description": "Autonomous multi-agent game factory powered by local LLMs",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "author": "edubs <edubs@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.66.1",
+    "express": "^5.2.1",
+    "playwright": "^1.59.1",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.2",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}
