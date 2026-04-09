@@ -57,9 +57,15 @@ function handleEvent(event) {
       appendStreamingToken(event);
       return;
     case 'message':
-      // If we had a streaming bubble for this agent, finalize it with stats — don't create duplicate
-      if (finalizeStreamingBubble(event.agent, event)) break;
-      addChatMessage(event);
+      var bubble = streamingBubbles[event.agent];
+      if (bubble && bubble.tokenCount > 0) {
+        // Streaming bubble has content — finalize it with final stats, skip duplicate
+        finalizeStreamingBubble(event.agent, event);
+      } else {
+        // No streaming bubble or empty one — show the full message
+        if (bubble) { bubble.div.remove(); delete streamingBubbles[event.agent]; }
+        addChatMessage(event);
+      }
       break;
     case 'screenshot':
       addScreenshot(event);
