@@ -1,25 +1,34 @@
-// src/supervisor/formed-builder.ts
+/**
+ * FormedBuilder — Incremental code generation for small models.
+ *
+ * Instead of rewriting entire files, each step ADDS code to existing files.
+ * Step 1: creates the base files
+ * Step 2+: reads existing file, asks model to write ONLY the new function/code,
+ *          then appends it before the final draw()/gameLoop() call.
+ *
+ * This prevents the "rewrite wipes good code" problem.
+ */
 
-import { LLMClient, type ChatResponse } from '../llm/client.js';
+import { LLMClient } from '../llm/client.js';
 import { FileTools } from '../tools/file-tools.js';
 import type { StepDefinition } from '../agents/types.js';
 import { EventEmitter } from 'node:events';
 
 export interface CodeFragment {
   id: string;
-  question: string;       // The atomic question to ask
-  infer_from?: string;    // Hint for the model
-  type: 'properties' | 'function' | 'block' | 'full_file' | 'html';
-  file: string;           // Which file this fragment belongs to
-  dependsOn?: string[];   // Fragment IDs that must be completed first
+  question: string;
+  infer_from?: string;
+  type: 'properties' | 'function' | 'block' | 'full_file' | 'html' | 'append';
+  file: string;
+  dependsOn?: string[];
 }
 
 export interface FormedBuildStep {
   stepId: number;
   title: string;
-  files: string[];         // Files this step produces
-  fragments: CodeFragment[];  // Atomic code questions
-  assemblyTemplate?: string;  // How to combine fragments into final file
+  files: string[];
+  fragments: CodeFragment[];
+  assemblyTemplate?: string;
   encouragement: string;
 }
 
@@ -27,8 +36,12 @@ export interface FormedBuilderConfig {
   client: LLMClient;
   fileTools: FileTools;
   gameDir: string;
-  temperature?: number;    // Low temp for deterministic code (0.1-0.3)
+  temperature?: number;
 }
+
+const SYSTEM_FULL = 'You write clean, working JavaScript/HTML game code. Respond with ONLY the code, no explanation, no markdown fences. Output the COMPLETE file from first line to last line. The file must work standalone.';
+
+const SYSTEM_APPEND = 'You write clean, working JavaScript game code. You are ADDING new code to an existing file. Write ONLY the new functions/variables needed for this step. Do NOT rewrite existing code. Do NOT include code that already exists. Just the new additions. No markdown fences, no explanation.';
 
 export class FormedBuilder extends EventEmitter {
   private client: LLMClient;
@@ -44,18 +57,14 @@ export class FormedBuilder extends EventEmitter {
     this.temperature = config.temperature ?? 0.2;
   }
 
-  /**
-   * Execute a formed build step — ask atomic questions, assemble code
-   */
   async executeStep(step: FormedBuildStep): Promise<{
-    files: Record<string, string>;  // filename -> content
+    files: Record<string, string>;
     success: boolean;
-    fragments: Record<string, string>;  // fragmentId -> extracted answer
+    fragments: Record<string, string>;
   }> {
     const collected: Record<string, string> = {};
 
     for (const fragment of step.fragments) {
-      // Check dependencies
       if (fragment.dependsOn) {
         const missing = fragment.dependsOn.filter(id => !collected[id]);
         if (missing.length > 0) {
@@ -64,51 +73,62 @@ export class FormedBuilder extends EventEmitter {
         }
       }
 
-      // Build minimal context
-      const context = this.buildFragmentContext(fragment, collected, step);
-
-      // Ask one atomic question
       this.emit('fragment_start', { id: fragment.id, question: fragment.question });
 
+      const isAppend = fragment.type === 'append';
+      const systemPrompt = isAppend ? SYSTEM_APPEND : SYSTEM_FULL;
+      const context = this.buildFragmentContext(fragment, collected, step);
+
       const response = await this.client.chat(
-        this.client.buildMessages(
-          this.getSystemPrompt(fragment.type),
-          context
-        ),
-        {
-          onToken: (token) => this.emit('token', { agent: 'builder', token }),
-        }
+        this.client.buildMessages(systemPrompt, context),
+        { onToken: (token) => this.emit('token', { agent: 'builder', token }) }
       );
 
-      // Extract the code/answer from response
       const extracted = this.extractAnswer(response.content, fragment.type);
       collected[fragment.id] = extracted;
 
       this.emit('fragment_done', {
         id: fragment.id,
-        content: extracted,
+        content: extracted.substring(0, 200),
         tokensOut: response.tokensOut,
         tokPerSec: response.tokensOut / (response.durationMs / 1000),
       });
     }
 
-    // Assemble fragments into complete files
+    // Write files
     const files: Record<string, string> = {};
     for (const fileName of step.files) {
-      const fileFragments = step.fragments
-        .filter(f => f.file === fileName)
-        .map(f => collected[f.id])
-        .filter(Boolean);
+      const fileFragments = step.fragments.filter(f => f.file === fileName);
+      if (fileFragments.length === 0) continue;
 
-      if (step.assemblyTemplate) {
-        files[fileName] = this.applyTemplate(step.assemblyTemplate, collected);
+      if (fileFragments[0].type === 'full_file' || fileFragments[0].type === 'html') {
+        // Step 1: write complete file
+        files[fileName] = collected[fileFragments[0].id] || '';
+      } else if (fileFragments[0].type === 'append') {
+        // Step 2+: read existing, append new code
+        let existing = '';
+        try { existing = this.fileTools.readFile(fileName); } catch { /* new file */ }
+
+        const newCode = fileFragments
+          .map(f => collected[f.id])
+          .filter(Boolean)
+          .join('\n\n');
+
+        files[fileName] = existing ? this.insertCode(existing, newCode) : newCode;
       } else {
-        files[fileName] = fileFragments.join('\n\n');
+        files[fileName] = fileFragments
+          .map(f => collected[f.id])
+          .filter(Boolean)
+          .join('\n\n');
       }
     }
 
-    // Write files
+    // Backup existing files before writing
     for (const [path, content] of Object.entries(files)) {
+      try {
+        const existing = this.fileTools.readFile(path);
+        this.fileTools.writeFile(path + '.backup', existing);
+      } catch { /* no existing file */ }
       this.fileTools.writeFile(path, content);
     }
 
@@ -116,30 +136,39 @@ export class FormedBuilder extends EventEmitter {
   }
 
   /**
-   * Convert a regular StepDefinition into a FormedBuildStep.
-   *
-   * Strategy: ONE fragment per file. Each fragment asks for a COMPLETE file.
-   * This avoids assembly bugs (duplicate declarations, missing context).
-   * The model gets the full task + existing file content + algorithm hints,
-   * then writes the entire file. This is what tested perfectly on E2B.
+   * Decompose a step into fragments.
+   * Step 1 (filesToCreate): write complete files
+   * Step 2+ (filesToModify): append new code to existing files
    */
   async decomposeStep(step: StepDefinition): Promise<FormedBuildStep> {
-    const allFiles = [...(step.filesToCreate || []), ...(step.filesToModify || [])];
+    const creates = step.filesToCreate || [];
+    const modifies = step.filesToModify || [];
+    const allFiles = [...creates, ...modifies];
 
-    const fragments: CodeFragment[] = allFiles.map((file, i) => {
-      // Build a focused question for this specific file
-      let question = `${step.task}\n\n`;
-      question += `Write the COMPLETE ${file} file. Include ALL code needed — declarations, functions, everything.\n`;
-      question += `Do not write partial code. Write the full, working file from top to bottom.`;
+    if (allFiles.length === 0) {
+      allFiles.push('game.js');
+      modifies.push('game.js');
+    }
 
-      return {
-        id: `file-${i}-${file.replace(/[\/\.]/g, '-')}`,
-        question,
-        type: 'full_file' as const,
+    const fragments: CodeFragment[] = [];
+
+    for (const file of creates) {
+      fragments.push({
+        id: 'create-' + file.replace(/[\/\.]/g, '-'),
+        question: step.task + '\n\nWrite the COMPLETE ' + file + ' file.',
+        type: file.endsWith('.html') ? 'html' : 'full_file',
         file,
-        dependsOn: i > 0 ? [`file-${i - 1}-${allFiles[i - 1].replace(/[\/\.]/g, '-')}`] : undefined,
-      };
-    });
+      });
+    }
+
+    for (const file of modifies) {
+      fragments.push({
+        id: 'append-' + file.replace(/[\/\.]/g, '-'),
+        question: step.task + '\n\nWrite ONLY the new code needed for this step. Do NOT rewrite existing functions. Just the new additions.',
+        type: 'append',
+        file,
+      });
+    }
 
     return {
       stepId: step.stepId,
@@ -150,6 +179,33 @@ export class FormedBuilder extends EventEmitter {
     };
   }
 
+  /**
+   * Insert new code before the draw/gameLoop function.
+   * New functions get defined before they're called.
+   */
+  private insertCode(existing: string, newCode: string): string {
+    const insertPoints = [
+      /^function\s+draw\s*\(/m,
+      /^function\s+render\s*\(/m,
+      /^function\s+gameLoop\s*\(/m,
+      /^function\s+update\s*\(/m,
+      /^\/\/\s*---\s*Game\s*Loop/im,
+      /^\/\/\s*---\s*Draw/im,
+      /^\/\/\s*---\s*Render/im,
+    ];
+
+    for (const pattern of insertPoints) {
+      const match = pattern.exec(existing);
+      if (match && match.index > 0) {
+        const before = existing.substring(0, match.index);
+        const after = existing.substring(match.index);
+        return before + '\n// --- Added by step ---\n' + newCode + '\n\n' + after;
+      }
+    }
+
+    return existing + '\n\n// --- Added by step ---\n' + newCode;
+  }
+
   private buildFragmentContext(
     fragment: CodeFragment,
     collected: Record<string, string>,
@@ -157,56 +213,36 @@ export class FormedBuilder extends EventEmitter {
   ): string {
     const parts: string[] = [];
 
-    parts.push(`Game step: ${step.title}`);
-    parts.push(`File: ${fragment.file}`);
+    parts.push('Game step: ' + step.title);
+    parts.push('File: ' + fragment.file);
 
-    // Include other files already written in this step (cross-file context)
-    const otherFiles = step.fragments
-      .filter(f => f.file !== fragment.file && collected[f.id])
-      .map(f => `// ${f.file}:\n${collected[f.id]}`);
-
-    if (otherFiles.length > 0) {
-      parts.push(`\nOther files already written in this step:\n${otherFiles.join('\n\n')}`);
+    if (fragment.type === 'append') {
+      try {
+        const existing = this.fileTools.readFile(fragment.file);
+        parts.push('\nExisting file content (DO NOT rewrite this, only add new code):\n```\n' + existing + '\n```');
+      } catch {
+        parts.push('\nFile does not exist yet.');
+      }
     }
 
-    // Include existing file content if modifying
-    try {
-      const existing = this.fileTools.readFile(fragment.file);
-      if (existing && !existing.startsWith('// File:')) {
-        parts.push(`\nCurrent file content:\n${existing}`);
-      }
-    } catch { /* file doesn't exist yet */ }
+    const otherFiles = step.fragments
+      .filter(f => f.file !== fragment.file && collected[f.id])
+      .map(f => '// ' + f.file + ':\n' + collected[f.id]);
 
-    parts.push(`\n${fragment.question}`);
+    if (otherFiles.length > 0) {
+      parts.push('\nOther files:\n' + otherFiles.join('\n\n'));
+    }
+
+    parts.push('\n' + fragment.question);
 
     if (fragment.infer_from) {
-      parts.push(`\nHint: ${fragment.infer_from}`);
+      parts.push('\nHint: ' + fragment.infer_from);
     }
 
     return parts.join('\n');
   }
 
-  private getSystemPrompt(type: string): string {
-    const base = 'You write clean, working JavaScript/HTML game code. Respond with ONLY the code, no explanation, no markdown fences.';
-
-    switch (type) {
-      case 'properties':
-        return base + ' Output only variable declarations or object properties.';
-      case 'function':
-        return base + ' Output only the function/method body. Keep it under 20 lines.';
-      case 'block':
-        return base + ' Output only the code block requested.';
-      case 'html':
-        return base + ' Output only the HTML requested.';
-      case 'full_file':
-        return base + ' Output the COMPLETE file from first line to last line. Include all imports, declarations, functions, and initialization code. The file must work standalone — do not reference variables or functions that are not defined in this file or loaded via script tags.';
-      default:
-        return base;
-    }
-  }
-
   private extractAnswer(content: string, _type: string): string {
-    // Strip markdown fences if present
     let cleaned = content.trim();
     const fenceMatch = cleaned.match(/```(?:javascript|js|html|css)?\n?([\s\S]*?)```/);
     if (fenceMatch) {
@@ -218,7 +254,7 @@ export class FormedBuilder extends EventEmitter {
   private applyTemplate(template: string, collected: Record<string, string>): string {
     let result = template;
     for (const [key, value] of Object.entries(collected)) {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      result = result.replace(new RegExp('\\{\\{' + key + '\\}\\}', 'g'), value);
     }
     return result;
   }
