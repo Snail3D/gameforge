@@ -15,6 +15,7 @@ import { StepFeeder } from './step-feeder.js';
 import type { StepLogEntry } from './step-feeder.js';
 import { FileTools } from '../tools/file-tools.js';
 import { captureGameScreenshot } from '../tools/screenshot.js';
+import { FormedBuilder } from './formed-builder.js';
 import type { GameForgeConfig } from '../config.js';
 import type { BuildPlan, MiniLoopResult, StepDefinition } from '../agents/types.js';
 import type { GameForgeEvent, Mode } from '../logging/event-types.js';
@@ -24,6 +25,7 @@ export interface SupervisorOptions {
   mode: Mode;
   userPrompt: string;
   timer?: number;
+  useFormedBuilder?: boolean;  // Use FormedSkill atomic step builder (better for small models)
 }
 
 export class Supervisor extends EventEmitter {
@@ -32,6 +34,7 @@ export class Supervisor extends EventEmitter {
   private userPrompt: string;
   private timer: number | undefined;
   private running: boolean = false;
+  private useFormedBuilder: boolean;
 
   private logger: SessionLogger | null = null;
   private loopDetector: LoopDetector | null = null;
@@ -55,6 +58,7 @@ export class Supervisor extends EventEmitter {
     this.mode = options.mode;
     this.userPrompt = options.userPrompt;
     this.timer = options.timer;
+    this.useFormedBuilder = options.useFormedBuilder ?? false;
     this.modelManager = new ModelManager(this.config.ollama.host);
   }
 
@@ -193,13 +197,9 @@ export class Supervisor extends EventEmitter {
       const step = this.feeder.currentStep();
       if (!step) break;
 
-      const result = await this.executeMiniLoop(
-        step,
-        builderClient,
-        builderPrompt,
-        reviewerPrompt,
-        criticPrompt,
-      );
+      const result = this.useFormedBuilder
+        ? await this.executeFormedMiniLoop(step, builderClient, reviewerPrompt, criticPrompt)
+        : await this.executeMiniLoop(step, builderClient, builderPrompt, reviewerPrompt, criticPrompt);
 
       const status = result.status === 'passed' ? 'passed' : 'skipped';
       this.feeder.markCompleted(step.stepId, status, [{ attempt: result.attempts }]);
@@ -497,6 +497,237 @@ export class Supervisor extends EventEmitter {
       attempts: step.maxAttempts,
       criticFeedback,
     };
+  }
+
+  private async executeFormedMiniLoop(
+    step: StepDefinition,
+    builderClient: LLMClient,
+    reviewerPrompt: string,
+    criticPrompt: string,
+  ): Promise<MiniLoopResult> {
+    const builderModel = this.config.ollama.models.builder;
+    const reviewerModel = this.config.ollama.models.reviewer;
+    const criticModel = this.config.ollama.models.critic;
+
+    this.emitEvent({
+      type: 'step_assign',
+      ts: new Date().toISOString(),
+      agent: 'supervisor',
+      model: builderModel,
+      stepId: String(step.stepId),
+      title: step.title,
+    });
+
+    const formedBuilder = new FormedBuilder({
+      client: builderClient,
+      fileTools: this.fileTools!,
+      gameDir: this.gameDir,
+      temperature: 0.2,
+    });
+
+    // Wire FormedBuilder events to dashboard
+    formedBuilder.on('fragment_start', ({ id, question }: { id: string; question: string }) => {
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: 'none',
+        content: `Fragment: ${id} — ${question}`,
+        tokensIn: 0, tokensOut: 0, tokPerSec: 0,
+      });
+    });
+
+    formedBuilder.on('fragment_done', ({ id, content, tokensOut, tokPerSec }: { id: string; content: string; tokensOut?: number; tokPerSec?: number }) => {
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'builder',
+        model: builderModel,
+        content: `[${id}]\n${content}`,
+        tokensIn: 0,
+        tokensOut: tokensOut || 0,
+        tokPerSec: tokPerSec || 0,
+      });
+    });
+
+    formedBuilder.on('token', ({ agent, token }: { agent: string; token: string }) => {
+      this.emit('token', { agent, token });
+    });
+
+    let criticFeedback: string | undefined;
+
+    for (let attempt = 1; attempt <= step.maxAttempts; attempt++) {
+      this.heartbeat!.ping();
+
+      // On retry, add critic feedback to the step context
+      const stepWithFeedback = criticFeedback
+        ? { ...step, context: `${step.context}\n\nPrevious attempt feedback: ${criticFeedback}` }
+        : step;
+
+      const formedStep = await formedBuilder.decomposeStep(stepWithFeedback);
+
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: 'none',
+        content: `Decomposed into ${formedStep.fragments.length} atomic fragments`,
+        tokensIn: 0, tokensOut: 0, tokPerSec: 0,
+      });
+
+      // Execute all fragments
+      const result = await formedBuilder.executeStep(formedStep);
+
+      // Show what files were saved
+      const savedFiles = Object.keys(result.files);
+      if (savedFiles.length > 0) {
+        this.emitEvent({
+          type: 'tool_call',
+          ts: new Date().toISOString(),
+          agent: 'builder',
+          model: builderModel,
+          tool: 'write_file',
+          args: { files: savedFiles },
+          result: `Saved ${savedFiles.length} file(s): ${savedFiles.join(', ')}`,
+        });
+      }
+
+      // Reviewer
+      const reviewerClient = new LLMClient({
+        baseUrl: this.config.ollama.host,
+        model: reviewerModel,
+      });
+
+      let reviewContext = `Review for step "${step.title}":\n\n`;
+      for (const [path, code] of Object.entries(result.files)) {
+        reviewContext += `## ${path}\n\`\`\`\n${code}\n\`\`\`\n\n`;
+      }
+      reviewContext += `Acceptance criteria:\n${step.acceptanceCriteria.map(c => `- ${c}`).join('\n')}`;
+
+      const reviewerMessages = reviewerClient.buildMessages(
+        readFileSync(join(resolve(process.cwd(), 'src/prompts'), 'reviewer.md'), 'utf-8'),
+        reviewContext,
+      );
+      const reviewerResponse = await reviewerClient.chat(reviewerMessages);
+
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'reviewer',
+        model: reviewerModel,
+        content: reviewerResponse.content,
+        tokensIn: reviewerResponse.tokensIn,
+        tokensOut: reviewerResponse.tokensOut,
+        tokPerSec: reviewerResponse.tokensOut / (reviewerResponse.durationMs / 1000),
+      });
+
+      const reviewResult = this.miniLoop!.parseReviewerVerdict(reviewerResponse.content);
+      if (!reviewResult.passed) {
+        criticFeedback = reviewerResponse.content;
+        continue;
+      }
+
+      if (reviewResult.hasFixedCode) {
+        const fixedFiles = this.extractAndSaveCode(reviewerResponse.content);
+        if (fixedFiles.length > 0) {
+          this.emitEvent({
+            type: 'tool_call',
+            ts: new Date().toISOString(),
+            agent: 'reviewer',
+            model: reviewerModel,
+            tool: 'write_file',
+            args: { files: fixedFiles },
+            result: `Reviewer fixed ${fixedFiles.length} file(s)`,
+          });
+        }
+      }
+
+      // Screenshot
+      const screenshot = await captureGameScreenshot(this.gameDir, this.metaDir, step.stepId);
+
+      this.emitEvent({
+        type: 'game_reload',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: builderModel,
+        success: screenshot.loaded,
+        consoleErrors: screenshot.errors,
+      });
+
+      // Critic
+      const criticClient = new LLMClient({
+        baseUrl: this.config.ollama.host,
+        model: criticModel,
+      });
+
+      const criticUserMessage = `Review step "${step.title}" with these acceptance criteria:\n${step.acceptanceCriteria.map(c => `- ${c}`).join('\n')}\n\nProvide your verdict in format:\nVERDICT: PASS or FAIL\nREASON: <reason>\nFEATURE_UPDATES: <comma separated feature ids>`;
+
+      const images = screenshot.base64
+        ? [{ base64: screenshot.base64, mimeType: 'image/png' }]
+        : [];
+
+      const criticMessages = criticClient.buildMessages(
+        readFileSync(join(resolve(process.cwd(), 'src/prompts'), 'critic.md'), 'utf-8'),
+        criticUserMessage,
+        undefined,
+        images,
+      );
+
+      const criticResponse = await criticClient.chat(criticMessages);
+      const verdict = this.miniLoop!.parseCriticVerdict(criticResponse.content);
+
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'critic',
+        model: criticModel,
+        content: criticResponse.content,
+        tokensIn: criticResponse.tokensIn,
+        tokensOut: criticResponse.tokensOut,
+        tokPerSec: criticResponse.tokensOut / (criticResponse.durationMs / 1000),
+      });
+
+      if (screenshot.base64) {
+        this.emitEvent({
+          type: 'screenshot',
+          ts: new Date().toISOString(),
+          agent: 'critic',
+          model: criticModel,
+          path: screenshot.path,
+          base64: screenshot.base64,
+          description: verdict.feedback.substring(0, 200),
+        });
+      }
+
+      this.emitEvent({
+        type: 'step_update',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: builderModel,
+        stepId: String(step.stepId),
+        status: verdict.passed ? 'passed' : 'failed',
+        attempt,
+      });
+
+      if (verdict.passed) {
+        return { stepId: step.stepId, status: 'passed', attempts: attempt, criticFeedback: verdict.feedback };
+      }
+
+      criticFeedback = verdict.feedback;
+    }
+
+    // All attempts exhausted
+    this.emitEvent({
+      type: 'step_update',
+      ts: new Date().toISOString(),
+      agent: 'supervisor',
+      model: builderModel,
+      stepId: String(step.stepId),
+      status: 'skipped',
+      attempt: step.maxAttempts,
+    });
+
+    return { stepId: step.stepId, status: 'skipped', attempts: step.maxAttempts };
   }
 
   private handleStall(): void {

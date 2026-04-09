@@ -11,6 +11,7 @@ const prompt = args.filter(a => !a.startsWith('--')).join(' ') || 'Make a fun br
 const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
 const timer = timerStr ? parseInt(timerStr, 10) : 120;
 const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
+const useFormed = args.includes('--formed') || preset === 'e4b' || preset === 'e2b';
 
 const config = loadConfig({ preset });
 
@@ -18,7 +19,7 @@ const config = loadConfig({ preset });
 const dashboard = startDashboard(config.dashboard.port);
 
 // Start supervisor
-const supervisor = new Supervisor({ config, mode, userPrompt: prompt, timer });
+const supervisor = new Supervisor({ config, mode, userPrompt: prompt, timer, useFormedBuilder: useFormed });
 
 // Wire events to dashboard
 supervisor.on('event', (event: any) => {
@@ -64,6 +65,7 @@ console.log(`
   ⚒ GAMEFORGE
   Mode: ${mode}
   Preset: ${preset}
+  FormedBuilder: ${useFormed ? 'ON' : 'OFF'}
   Prompt: ${prompt}
   Dashboard: http://localhost:${config.dashboard.port}
 `);
