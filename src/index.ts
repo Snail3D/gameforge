@@ -1,4 +1,5 @@
 import { loadConfig } from './config.js';
+import type { ModelPreset } from './config.js';
 import { Supervisor } from './supervisor/supervisor.js';
 import { startDashboard } from './dashboard/server.js';
 import type { Mode } from './logging/event-types.js';
@@ -9,8 +10,9 @@ const mode = (args.find(a => a.startsWith('--mode='))?.split('=')[1] || 'build')
 const prompt = args.filter(a => !a.startsWith('--')).join(' ') || 'Make a fun browser game';
 const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
 const timer = timerStr ? parseInt(timerStr, 10) : 120;
+const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
 
-const config = loadConfig();
+const config = loadConfig({ preset });
 
 // Start dashboard
 const dashboard = startDashboard(config.dashboard.port);
@@ -61,6 +63,7 @@ process.on('SIGINT', () => {
 console.log(`
   ⚒ GAMEFORGE
   Mode: ${mode}
+  Preset: ${preset}
   Prompt: ${prompt}
   Dashboard: http://localhost:${config.dashboard.port}
 `);

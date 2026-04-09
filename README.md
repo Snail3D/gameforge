@@ -32,6 +32,28 @@ User Prompt → Planner (GPT-oss 120B) → Build Plan
   → Repeat for each step
 ```
 
+## Model Presets
+
+```bash
+# Default: GPT-oss 120B plans, Gemma 4 MoE builds (requires 128GB)
+npm run dev -- "Make a game" --mode=build
+
+# Single model: Gemma 4 MoE for everything (requires 32GB)
+npm run dev -- "Make a game" --mode=build --preset=single
+
+# E4B: Gemma 4 E4B for everything (requires 16GB)
+npm run dev -- "Make a game" --mode=build --preset=e4b
+
+# E2B: Gemma 4 E2B for everything (requires 8GB — runs on phones!)
+npm run dev -- "Make a game" --mode=build --preset=e2b
+```
+
+You can also set the preset via environment variable:
+
+```bash
+MODEL_PRESET=e4b npm run dev -- "Make a game"
+```
+
 ## Requirements
 
 - Node.js 22+

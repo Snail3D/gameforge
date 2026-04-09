@@ -121,16 +121,19 @@ export class Supervisor extends EventEmitter {
       tokPerSec: response.tokensOut / (response.durationMs / 1000),
     });
 
-    await this.modelManager.unloadModel(plannerModel);
+    const sameModel = plannerModel === builderModel;
+    if (!sameModel) {
+      await this.modelManager.unloadModel(plannerModel);
 
-    this.emitEvent({
-      type: 'model_swap',
-      ts: new Date().toISOString(),
-      agent: 'supervisor',
-      model: builderModel,
-      loading: builderModel,
-      unloading: plannerModel,
-    });
+      this.emitEvent({
+        type: 'model_swap',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: builderModel,
+        loading: builderModel,
+        unloading: plannerModel,
+      });
+    }
 
     const plan = this.parsePlanResponse(response.content);
 
