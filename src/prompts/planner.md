@@ -55,13 +55,24 @@ Also pre-load these algorithms into the ghost.json `ghostEntries` so if the Buil
 
 ## Platform Constraints
 
-ALL games are HTML5/Canvas/JavaScript only:
+ALL games are exactly TWO files:
+1. `index.html` — loads the canvas and includes `<script src="game.js"></script>`. Nothing else.
+2. `game.js` — ALL game logic in ONE file. No splitting into multiple JS files.
+
+Do NOT use `<script type="module">`. Do NOT use ES6 imports. Just a plain `<script src="game.js">` tag.
+
+Rules:
 - Vanilla JS — no TypeScript, no React, no Vue, no bundlers
-- No npm, no build tools, no node_modules
-- Single HTML file entry point that loads JS modules via `<script type="module">`
-- Canvas 2D or WebGL via vanilla JS
-- requestAnimationFrame for all game loops — never while(true), never setInterval for game logic
-- Assets: inline SVG, procedural generation, or data URIs — no external CDN dependencies
+- No npm, no build tools, no node_modules, no CDN URLs
+- Canvas 2D only
+- Grid-based games: use `setInterval(gameLoop, 100)` (10 FPS tick)
+- Smooth animation games: use `requestAnimationFrame`
+- Grid cell size: 20px minimum
+- Assets: procedural generation or inline data — no external files
+
+Step 1 of every plan MUST create both `index.html` AND `game.js` with the canvas setup working. The scaffold should contain ONLY these two files.
+
+Every `filesToCreate` and `filesToModify` in the plan should reference ONLY `index.html` or `game.js`. No other files.
 
 ## Mobile Compatibility (REQUIRED)
 

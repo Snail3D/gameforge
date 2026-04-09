@@ -10,9 +10,9 @@ Complete the current build step. Nothing else. Do not look ahead. Do not impleme
 
 Write your code in fenced code blocks with the file path after the language tag, like this:
 
-```js:core/engine.js
+```js:game.js
 // Your code here
-const canvas = document.getElementById('game');
+const canvas = document.getElementById('gameCanvas');
 ```
 
 ```html:index.html
@@ -22,26 +22,86 @@ const canvas = document.getElementById('game');
 
 IMPORTANT: Always include the file path after the colon. This is how your code gets saved to the right file. Write the COMPLETE file contents — not just a snippet.
 
+## Game Structure Rules — CRITICAL
+
+Every game MUST follow this exact structure:
+
+1. **One `index.html`** that loads one `game.js` via a script tag:
+```html
+<script src="game.js"></script>
+```
+
+2. **One `game.js`** that contains ALL game logic. Do NOT split into multiple JS files. One file. Everything in it.
+
+3. **The `index.html` template** — every game starts from this exact template. Modify the title and canvas size as needed, but keep this structure:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game Title</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #000; max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script src="game.js"></script>
+</body>
+</html>
+```
+
+4. **The `game.js` template** — always start with canvas setup:
+```js
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+```
+
+## Game Design Rules
+
+- **Grid-based games** (Snake, Tetris, Minesweeper): use CELL_SIZE = 20. Canvas = CELL_SIZE * grid count.
+- **Continuous games** (Pong, Breakout): use pixel coordinates directly.
+- **Game loop**: use `setInterval(gameLoop, 1000/10)` for grid-based games (10 FPS tick rate) or `requestAnimationFrame` for smooth animation games.
+- **Clear canvas every frame**: `ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);`
+- **Colors**: use bright colors on dark backgrounds. Snake = `#0f0`, food = `#f00`, paddle = `#fff`.
+
+## Mobile Controls — REQUIRED
+
+Every game MUST work on touchscreens:
+- **Arrow key games**: add on-screen directional buttons OR swipe detection
+- **Mouse games**: use `pointerdown`/`pointermove`/`pointerup` (works for both mouse and touch)
+- **No right-click**: use a toggle button for secondary actions (e.g., "Flag Mode" in Minesweeper)
+- **Minimum tap target**: 44x44 pixels for all interactive elements
+
+Simple swipe detection for arrow-key games:
+```js
+let touchStartX = 0, touchStartY = 0;
+canvas.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; });
+canvas.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy)) { /* horizontal swipe: dx > 0 = right, dx < 0 = left */ }
+    else { /* vertical swipe: dy > 0 = down, dy < 0 = up */ }
+});
+```
+
 ## Platform Rules — Non-Negotiable
 
-- Vanilla JavaScript only. No TypeScript. No React. No Vue. No Svelte.
-- No npm. No imports from node_modules. No CDN URLs.
-- Use `<script>` tags in index.html to load JS files (not ES6 modules — keep it simple).
-- Game loop: `requestAnimationFrame` only. Never `while(true)`. Never `setInterval` for game logic.
-- Canvas: always use `ctx.clearRect` at the start of every draw call.
-
-## Performance Rules
-
-- Pre-allocate arrays and objects outside of loops and animation frames.
-- Cache DOM lookups: `const canvas = document.getElementById('game')` once at init, not per frame.
-- Avoid creating new objects inside `requestAnimationFrame` callbacks.
+- Vanilla JavaScript only. No TypeScript. No React. No frameworks.
+- No npm. No imports. No CDN URLs. No ES6 modules.
+- `index.html` loads `game.js` with a `<script>` tag. That's it.
+- No `console.log` in final code.
 
 ## Code Quality Rules
 
-- No placeholders. No TODOs. No `// implement later`. Write complete, working code.
-- No `console.log` left in final code.
-- Every function must do one thing. Keep functions under 40 lines.
-- Variable names must be descriptive. `playerX` not `px`. `enemySpeed` not `es`.
+- No placeholders. No TODOs. Write complete, working code.
+- Every function must do one thing. Keep functions under 30 lines.
+- Variable names must be descriptive: `snakeBody` not `sb`, `cellSize` not `cs`.
 
 ## Finishing a Step
 
@@ -49,4 +109,3 @@ When you believe the step is complete:
 1. Re-read each acceptance criterion.
 2. Confirm each one is satisfied by the code you wrote.
 3. State which files you created or modified.
-4. State which acceptance criteria are met and how.
