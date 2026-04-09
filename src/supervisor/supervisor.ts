@@ -16,6 +16,7 @@ import type { StepLogEntry } from './step-feeder.js';
 import { FileTools } from '../tools/file-tools.js';
 import { captureGameScreenshot } from '../tools/screenshot.js';
 import { FormedBuilder } from './formed-builder.js';
+import { RecipeGenerator } from '../recipes/recipe-generator.js';
 import type { GameForgeConfig } from '../config.js';
 import type { BuildPlan, MiniLoopResult, StepDefinition } from '../agents/types.js';
 import type { GameForgeEvent, Mode } from '../logging/event-types.js';
@@ -25,7 +26,8 @@ export interface SupervisorOptions {
   mode: Mode;
   userPrompt: string;
   timer?: number;
-  useFormedBuilder?: boolean;  // Use FormedSkill atomic step builder (better for small models)
+  useFormedBuilder?: boolean;
+  useRecipeGenerator?: boolean;  // Use atomic recipe generation (better for complex games on small models)
 }
 
 export class Supervisor extends EventEmitter {
@@ -35,6 +37,7 @@ export class Supervisor extends EventEmitter {
   private timer: number | undefined;
   private running: boolean = false;
   private useFormedBuilder: boolean;
+  private useRecipeGenerator: boolean;
 
   private logger: SessionLogger | null = null;
   private loopDetector: LoopDetector | null = null;
@@ -59,6 +62,7 @@ export class Supervisor extends EventEmitter {
     this.userPrompt = options.userPrompt;
     this.timer = options.timer;
     this.useFormedBuilder = options.useFormedBuilder ?? false;
+    this.useRecipeGenerator = options.useRecipeGenerator ?? false;
     this.modelManager = new ModelManager(this.config.ollama.host);
   }
 
@@ -87,6 +91,56 @@ export class Supervisor extends EventEmitter {
   private async runPlanner(): Promise<BuildPlan> {
     const plannerModel = this.config.ollama.models.planner;
     const builderModel = this.config.ollama.models.builder;
+
+    // Recipe generator mode — ask atomic questions to build the plan
+    if (this.useRecipeGenerator) {
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: 'none',
+        content: 'Using Recipe Generator — building plan through atomic questions...',
+        tokensIn: 0, tokensOut: 0, tokPerSec: 0,
+      });
+
+      await this.modelManager.loadModel(plannerModel);
+
+      const generator = new RecipeGenerator({
+        client: new LLMClient({ baseUrl: this.config.ollama.host, model: plannerModel }),
+      });
+
+      const plan = await generator.generate(this.userPrompt);
+
+      const sameModel = plannerModel === builderModel;
+      if (!sameModel) {
+        await this.modelManager.unloadModel(plannerModel);
+      }
+
+      // Set up game directory
+      const gameName = this.extractGameName(plan.gameDesign);
+      this.gameDir = join(this.config.gamesDir, gameName);
+      this.metaDir = join(this.gameDir, '_meta');
+      mkdirSync(this.gameDir, { recursive: true });
+      mkdirSync(this.metaDir, { recursive: true });
+
+      this.fileTools = new FileTools(this.gameDir);
+      for (const [path, content] of Object.entries(plan.scaffold || {})) {
+        this.fileTools.writeFile(path, content);
+      }
+
+      this.logger = new SessionLogger(this.metaDir, gameName);
+
+      this.emitEvent({
+        type: 'message',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: 'none',
+        content: `Recipe generated: ${plan.buildSteps.length} steps, ${plan.ghost.ghostEntries.length} ghost entries`,
+        tokensIn: 0, tokensOut: 0, tokPerSec: 0,
+      });
+
+      return plan;
+    }
 
     this.emitEvent({
       type: 'model_swap',

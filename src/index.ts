@@ -12,6 +12,7 @@ const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
 const timer = timerStr ? parseInt(timerStr, 10) : 120;
 const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
 const useFormed = args.includes('--formed') || preset === 'e4b' || preset === 'e2b';
+const useRecipe = args.includes('--recipe') || preset === 'e4b' || preset === 'e2b';
 
 const config = loadConfig({ preset });
 
@@ -19,7 +20,11 @@ const config = loadConfig({ preset });
 const dashboard = startDashboard(config.dashboard.port);
 
 // Start supervisor
-const supervisor = new Supervisor({ config, mode, userPrompt: prompt, timer, useFormedBuilder: useFormed });
+const supervisor = new Supervisor({
+  config, mode, userPrompt: prompt, timer,
+  useFormedBuilder: useFormed,
+  useRecipeGenerator: useRecipe,
+});
 
 // Wire events to dashboard
 supervisor.on('event', (event: any) => {
@@ -66,6 +71,7 @@ console.log(`
   Mode: ${mode}
   Preset: ${preset}
   FormedBuilder: ${useFormed ? 'ON' : 'OFF'}
+  RecipeGenerator: ${useRecipe ? 'ON' : 'OFF'}
   Prompt: ${prompt}
   Dashboard: http://localhost:${config.dashboard.port}
 `);
