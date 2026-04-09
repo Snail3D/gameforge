@@ -817,7 +817,27 @@ export class Supervisor extends EventEmitter {
   private parsePlanResponse(content: string): BuildPlan {
     const jsonBlockMatch = /```json\s*([\s\S]*?)```/.exec(content);
     const jsonStr = jsonBlockMatch ? jsonBlockMatch[1].trim() : content.trim();
-    return JSON.parse(jsonStr) as BuildPlan;
+    const raw = JSON.parse(jsonStr) as BuildPlan;
+
+    // Sanitize — small model planners may omit optional fields
+    raw.buildSteps = (raw.buildSteps || []).map(step => ({
+      ...step,
+      filesToCreate: step.filesToCreate || [],
+      filesToModify: step.filesToModify || [],
+      acceptanceCriteria: step.acceptanceCriteria || ['Step completes without errors'],
+      encouragement: step.encouragement || 'You got this!',
+      maxAttempts: step.maxAttempts || 3,
+      context: step.context || '',
+      task: step.task || step.title || '',
+    }));
+    raw.features = raw.features || [];
+    raw.scaffold = raw.scaffold || {};
+    raw.ghost = raw.ghost || { ghostEntries: [], knownWeaknesses: [] };
+    raw.ghost.ghostEntries = raw.ghost.ghostEntries || [];
+    raw.ghost.knownWeaknesses = raw.ghost.knownWeaknesses || [];
+    raw.gameDesign = raw.gameDesign || 'A browser game';
+
+    return raw;
   }
 
   private extractGameName(gameDesign: string): string {

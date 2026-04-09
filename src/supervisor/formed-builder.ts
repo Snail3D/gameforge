@@ -124,7 +124,7 @@ export class FormedBuilder extends EventEmitter {
    * then writes the entire file. This is what tested perfectly on E2B.
    */
   async decomposeStep(step: StepDefinition): Promise<FormedBuildStep> {
-    const allFiles = [...step.filesToCreate, ...step.filesToModify];
+    const allFiles = [...(step.filesToCreate || []), ...(step.filesToModify || [])];
 
     const fragments: CodeFragment[] = allFiles.map((file, i) => {
       // Build a focused question for this specific file
