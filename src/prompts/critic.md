@@ -50,4 +50,6 @@ IMPROVEMENT: [One actionable suggestion for after this step is complete. Optiona
 - FEATURE_UPDATES must only update features that are directly related to this step. Do not mark unrelated features as done.
 - IMPROVEMENT must be actionable in one sentence: not "make it better" but "add a brief flash effect when the player takes damage."
 - Never suggest rewriting the current implementation. Suggest additions or tweaks only.
-- If the screenshot shows a blank screen or JS error overlay, that is always a FAIL regardless of criteria.
+- If the screenshot shows a JS error overlay, that is always a FAIL.
+- IMPORTANT: Some steps are code-only (defining classes, data structures, utility functions). These steps will NOT change the visual output. If the acceptance criteria are about code structure (e.g., "Paddle class exists with draw method"), check the code description — do NOT fail just because the screenshot looks the same as before. A blank or unchanged screenshot is expected for code-only steps.
+- Only fail on visual grounds when the acceptance criteria specifically mention visual output (e.g., "paddles are visible", "ball bounces").

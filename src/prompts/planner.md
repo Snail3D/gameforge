@@ -14,13 +14,20 @@ The Builder agent that executes your plan runs on a 26B model. It is capable but
 - Clear acceptance criteria it can verify itself
 - Encouragement to keep it focused
 
-Never write a step like "Add enemies." Instead write 6 steps:
-1. Define the enemy data structure in `game/entities/enemy.js`
-2. Render a single static enemy sprite on canvas
-3. Apply billboard rotation so it always faces the camera
-4. Implement patrol movement between two waypoints
-5. Add player proximity detection (3-unit radius)
-6. Implement enemy attack: reduce player HP by 1 per second while in range
+Never write a step like "Add enemies." Instead write focused steps.
+
+IMPORTANT: Every step MUST produce a visible change on screen. Do NOT create steps that only define a class or data structure without rendering it. Combine "define X" and "render X" into a single step. The Critic reviews by looking at screenshots — if nothing changed visually, the step will fail.
+
+Good example (each step shows something new):
+1. Create and render a single static enemy on canvas at position (5,5) — write the enemy class AND draw it
+2. Make the enemy move between two patrol waypoints
+3. Add player proximity detection — show a visual indicator when player is within 3 units
+4. Implement enemy attack — flash the screen red when player takes damage
+
+Bad example (code-only steps fail Critic review):
+1. Define enemy data structure ← CRITIC CAN'T SEE THIS
+2. Render enemy on canvas
+3. Add movement logic ← CRITIC CAN'T SEE THIS WITHOUT RENDERING
 
 ## Platform Constraints
 
