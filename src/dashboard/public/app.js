@@ -60,9 +60,6 @@ function handleEvent(event) {
       finalizeStreamingBubble(event.agent);
       addChatMessage(event);
       break;
-    case 'tool_call':
-      addToolCall(event);
-      break;
     case 'screenshot':
       addScreenshot(event);
       break;
@@ -89,10 +86,18 @@ function handleEvent(event) {
     case 'system_stats':
       updateStats(event);
       break;
+    case 'game_ready':
+      gameIframe.src = event.url || '/game/index.html';
+      addSystemMessage('Game preview loaded: ' + (event.url || '/game/index.html'), 'supervisor');
+      break;
     case 'game_reload':
       if (event.success) reloadGameIframe();
       addSystemMessage('Game reload: ' + (event.success ? 'success' : 'failed') +
         (event.consoleErrors.length ? ' (' + event.consoleErrors.length + ' errors)' : ''), event.agent);
+      break;
+    case 'tool_call':
+      if (event.tool === 'write_file') reloadGameIframe();
+      addToolCall(event);
       break;
     case 'loop_detected':
       addSystemMessage('Loop detected (attempt ' + event.recoveryAttempt + '): ' + escapeText(event.repeatedTokens).slice(0, 80), event.agent);

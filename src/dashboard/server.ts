@@ -8,6 +8,7 @@ import { EventBroadcaster } from './events.js';
 export interface DashboardServer {
   broadcaster: EventBroadcaster;
   close: () => void;
+  serveGameDir: (gameDir: string) => void;
 }
 
 export function startDashboard(port: number): DashboardServer {
@@ -17,7 +18,6 @@ export function startDashboard(port: number): DashboardServer {
   const broadcaster = new EventBroadcaster(wss);
 
   // Serve static files from public/ directory
-  // Use import.meta.url to resolve __dirname equivalent
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const publicDir = resolve(__dirname, 'public');
   app.use(express.static(publicDir));
@@ -27,6 +27,16 @@ export function startDashboard(port: number): DashboardServer {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
 
+  // Serve game files at /game/ — set dynamically when game dir is known
+  let currentGameDir: string | null = null;
+  app.use('/game', (req, res, next) => {
+    if (!currentGameDir) {
+      res.status(404).send('No game loaded yet');
+      return;
+    }
+    express.static(currentGameDir)(req, res, next);
+  });
+
   server.listen(port, () => {
     console.log(`GameForge Dashboard: http://localhost:${port}`);
   });
@@ -34,5 +44,8 @@ export function startDashboard(port: number): DashboardServer {
   return {
     broadcaster,
     close: () => server.close(),
+    serveGameDir: (gameDir: string) => {
+      currentGameDir = gameDir;
+    },
   };
 }

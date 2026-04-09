@@ -19,9 +19,26 @@ const dashboard = startDashboard(config.dashboard.port);
 const supervisor = new Supervisor({ config, mode, userPrompt: prompt, timer });
 
 // Wire events to dashboard
-supervisor.on('event', (event) => {
+supervisor.on('event', (event: any) => {
+  // When game directory is created, start serving it and tell the frontend
+  if (event.type === 'step_assign' && !gameReady) {
+    const gameDir = supervisor.getGameDir();
+    if (gameDir) {
+      dashboard.serveGameDir(gameDir);
+      dashboard.broadcaster.broadcast({
+        type: 'game_ready',
+        ts: new Date().toISOString(),
+        agent: 'supervisor',
+        model: 'none',
+        url: '/game/index.html',
+      } as any);
+      gameReady = true;
+    }
+  }
   dashboard.broadcaster.broadcast(event);
 });
+
+let gameReady = false;
 
 supervisor.on('token', ({ agent, token }) => {
   dashboard.broadcaster.broadcast({

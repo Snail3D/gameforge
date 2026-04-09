@@ -58,6 +58,10 @@ export class Supervisor extends EventEmitter {
     this.modelManager = new ModelManager(this.config.ollama.host);
   }
 
+  getGameDir(): string {
+    return this.gameDir;
+  }
+
   async start(): Promise<void> {
     this.running = true;
     this.startTime = Date.now();
