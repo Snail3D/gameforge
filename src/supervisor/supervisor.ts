@@ -281,6 +281,20 @@ export class Supervisor extends EventEmitter {
         tokPerSec: builderResponse.tokensOut / (builderResponse.durationMs / 1000),
       });
 
+      // Extract code from Builder response and save to game files
+      const savedFiles = this.extractAndSaveCode(builderResponse.content);
+      if (savedFiles.length > 0) {
+        this.emitEvent({
+          type: 'tool_call',
+          ts: new Date().toISOString(),
+          agent: 'builder',
+          model: builderModel,
+          tool: 'write_file',
+          args: { files: savedFiles },
+          result: `Saved ${savedFiles.length} file(s): ${savedFiles.join(', ')}`,
+        });
+      }
+
       // Ghost interventions — smart path uses E4B for unmatched questions
       if (this.ghost!.isQuestion(builderResponse.content)) {
         const answer = await this.ghost!.answerQuestionSmart(
@@ -318,9 +332,23 @@ export class Supervisor extends EventEmitter {
         model: reviewerModel,
       });
 
+      // Build reviewer context with actual file contents
+      let reviewContext = `Review for step "${step.title}":\n\n`;
+      if (savedFiles.length > 0) {
+        for (const f of savedFiles) {
+          try {
+            const code = this.fileTools!.readFile(f);
+            reviewContext += `## ${f}\n\`\`\`\n${code}\n\`\`\`\n\n`;
+          } catch { /* file may not exist */ }
+        }
+      } else {
+        reviewContext += `Builder output:\n${builderResponse.content}\n\n`;
+      }
+      reviewContext += `Acceptance criteria:\n${step.acceptanceCriteria.map(c => `- ${c}`).join('\n')}`;
+
       const reviewerMessages = reviewerClient.buildMessages(
         reviewerPrompt,
-        `Review the following code output for step "${step.title}":\n\n${builderResponse.content}\n\nAcceptance criteria:\n${step.acceptanceCriteria.map(c => `- ${c}`).join('\n')}`,
+        reviewContext,
       );
 
       const reviewerResponse = await reviewerClient.chat(reviewerMessages);
@@ -463,6 +491,66 @@ export class Supervisor extends EventEmitter {
       pattern: 'heartbeat_stall',
       response: message,
     });
+  }
+
+  /**
+   * Extract code blocks from Builder response and save them to game files.
+   * Supports formats:
+   *   ```js:path/to/file.js
+   *   ```javascript:path/to/file.js
+   *   ```html:path/to/file.html
+   *   ## File: path/to/file.js  (followed by code block)
+   */
+  private extractAndSaveCode(content: string): string[] {
+    const savedFiles: string[] = [];
+    if (!this.fileTools) return savedFiles;
+
+    // Pattern 1: ```lang:filepath\n...code...\n```
+    const codeBlockPattern = /```(?:javascript|js|html|css|json)?[:\s]+([^\n`]+)\n([\s\S]*?)```/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = codeBlockPattern.exec(content)) !== null) {
+      const filePath = match[1].trim();
+      const code = match[2].trim();
+      if (filePath && code && filePath.includes('.')) {
+        try {
+          this.fileTools.writeFile(filePath, code);
+          savedFiles.push(filePath);
+        } catch { /* skip invalid paths */ }
+      }
+    }
+
+    // Pattern 2: ## File: path/to/file.js followed by a code block
+    if (savedFiles.length === 0) {
+      const fileHeaderPattern = /##\s*File:\s*([^\n]+)\n\s*```[^\n]*\n([\s\S]*?)```/gi;
+      while ((match = fileHeaderPattern.exec(content)) !== null) {
+        const filePath = match[1].trim();
+        const code = match[2].trim();
+        if (filePath && code && filePath.includes('.')) {
+          try {
+            this.fileTools.writeFile(filePath, code);
+            savedFiles.push(filePath);
+          } catch { /* skip invalid paths */ }
+        }
+      }
+    }
+
+    // Pattern 3: If step has filesToCreate and there's only one code block, use step's filename
+    if (savedFiles.length === 0) {
+      const singleBlock = /```(?:javascript|js|html|css|json)?\n([\s\S]*?)```/i.exec(content);
+      if (singleBlock) {
+        const step = this.feeder?.currentStep();
+        if (step && step.filesToCreate.length === 1) {
+          const filePath = step.filesToCreate[0];
+          try {
+            this.fileTools.writeFile(filePath, singleBlock[1].trim());
+            savedFiles.push(filePath);
+          } catch { /* skip */ }
+        }
+      }
+    }
+
+    return savedFiles;
   }
 
   private parsePlanResponse(content: string): BuildPlan {
