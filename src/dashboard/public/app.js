@@ -294,8 +294,20 @@ function addSystemMessage(text, agent) {
   autoScroll();
 }
 
+// Auto-scroll: only scroll to bottom if user is near the bottom already.
+// If they've scrolled up to read, leave them alone.
+// Resume auto-scroll when they scroll back to bottom.
+var userScrolledUp = false;
+
+chat.addEventListener('scroll', function() {
+  var atBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80;
+  userScrolledUp = !atBottom;
+});
+
 function autoScroll() {
-  chat.scrollTop = chat.scrollHeight;
+  if (!userScrolledUp) {
+    chat.scrollTop = chat.scrollHeight;
+  }
 }
 
 // ── Stats & Progress ──
