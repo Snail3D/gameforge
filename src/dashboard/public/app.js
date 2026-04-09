@@ -128,12 +128,21 @@ function appendStreamingToken(event) {
     div.appendChild(meta);
     chat.appendChild(div);
 
-    bubble = { div: div, content: content, text: '' };
+    bubble = { div: div, content: content, meta: meta, text: '', tokenCount: 0, startTime: Date.now() };
     streamingBubbles[agent] = bubble;
   }
 
   bubble.text += event.token;
+  bubble.tokenCount++;
   bubble.content.textContent = bubble.text;
+
+  // Update tok/s live
+  var elapsed = (Date.now() - bubble.startTime) / 1000;
+  if (elapsed > 0.5) {
+    var tps = (bubble.tokenCount / elapsed).toFixed(1);
+    bubble.meta.textContent = new Date().toLocaleTimeString() + ' | streaming... | ' + tps + ' tok/s';
+  }
+
   autoScroll();
 }
 

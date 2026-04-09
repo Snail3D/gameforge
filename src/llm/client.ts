@@ -111,6 +111,7 @@ export class LLMClient {
     let accumulated = '';
     let tokensIn = 0;
     let tokensOut = 0;
+    let tokenCount = 0;
 
     try {
       while (true) {
@@ -136,6 +137,7 @@ export class LLMClient {
             const token = parsed.choices[0]?.delta?.content;
             if (token) {
               accumulated += token;
+              tokenCount++;
               callbacks.onToken?.(token);
             }
 
@@ -151,6 +153,9 @@ export class LLMClient {
     } finally {
       reader.releaseLock();
     }
+
+    // Use stream-counted tokens if Ollama didn't provide usage stats
+    if (tokensOut === 0) tokensOut = tokenCount;
 
     const result: ChatResponse = {
       content: accumulated,
