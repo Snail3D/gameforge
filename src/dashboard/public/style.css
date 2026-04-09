@@ -151,12 +151,16 @@ main {
   overflow: hidden;
 }
 
-/* Game preview */
+/* Game preview — scales to fit container */
 .game-preview {
   flex: 1;
   min-height: 0;
-  background: var(--bg-card);
+  background: #000;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .game-preview iframe {
@@ -164,6 +168,8 @@ main {
   height: 100%;
   border: none;
   background: #000;
+  /* Scale game to fit without clipping */
+  transform-origin: top left;
 }
 
 /* Progress bar */
@@ -418,6 +424,34 @@ footer {
 
 footer strong {
   color: var(--text);
+}
+
+/* Responsive — narrow window / side panel mode */
+@media (max-width: 800px) {
+  main {
+    flex-direction: column;
+  }
+
+  .panel-left {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 45%;
+  }
+
+  .panel-right {
+    width: 100%;
+    flex: 1;
+  }
+
+  .feature-list-wrap {
+    display: none; /* hide features in narrow mode — progress bar is enough */
+  }
+
+  header h1 { font-size: 14px; letter-spacing: 2px; }
+  .game-name { display: none; }
+  .timer { font-size: 16px; }
+  footer { flex-wrap: wrap; gap: 8px; font-size: 10px; }
 }
 
 /* Scrollbar */
