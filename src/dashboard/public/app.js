@@ -57,7 +57,8 @@ function handleEvent(event) {
       appendStreamingToken(event);
       return;
     case 'message':
-      finalizeStreamingBubble(event.agent);
+      // If we had a streaming bubble for this agent, finalize it with stats — don't create duplicate
+      if (finalizeStreamingBubble(event.agent, event)) break;
       addChatMessage(event);
       break;
     case 'screenshot':
@@ -151,12 +152,21 @@ function appendStreamingToken(event) {
   autoScroll();
 }
 
-function finalizeStreamingBubble(agent) {
+function finalizeStreamingBubble(agent, finalEvent) {
   var bubble = streamingBubbles[agent];
   if (bubble) {
     bubble.div.classList.remove('streaming');
+    // Update meta with final stats
+    if (finalEvent) {
+      var ts = finalEvent.ts ? new Date(finalEvent.ts).toLocaleTimeString() : '';
+      var model = finalEvent.model || '';
+      var tps = (finalEvent.tokPerSec || 0).toFixed(1);
+      bubble.meta.textContent = ts + ' | ' + model + ' | ' + tps + ' tok/s';
+    }
     delete streamingBubbles[agent];
+    return true; // bubble existed, was finalized
   }
+  return false; // no streaming bubble to finalize
 }
 
 // ── Chat Messages ──
@@ -224,8 +234,22 @@ function addScreenshot(event) {
 
   if (event.base64) {
     var img = document.createElement('img');
-    img.src = 'data:image/png;base64,' + event.base64;
+    var imgSrc = 'data:image/png;base64,' + event.base64;
+    img.src = imgSrc;
     img.alt = event.description || 'screenshot';
+    img.style.cursor = 'pointer';
+    img.style.maxWidth = '300px';
+    img.style.borderRadius = '4px';
+    img.style.marginTop = '6px';
+    img.addEventListener('click', function() {
+      var win = window.open('', '_blank');
+      var body = win.document.body;
+      body.style.cssText = 'margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh';
+      var fullImg = win.document.createElement('img');
+      fullImg.src = imgSrc;
+      fullImg.style.cssText = 'max-width:100%;max-height:100vh';
+      body.appendChild(fullImg);
+    });
     div.appendChild(img);
   }
 
