@@ -10,6 +10,10 @@
 
 import { LLMClient } from '../llm/client.js';
 import { FileTools } from '../tools/file-tools.js';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { StepDefinition } from '../agents/types.js';
 import { EventEmitter } from 'node:events';
 
@@ -124,17 +128,30 @@ export class FormedBuilder extends EventEmitter {
       }
     }
 
-    // Backup and write
+    // Backup and write with syntax validation
     for (const [path, content] of Object.entries(files)) {
+      let backup = '';
       try {
-        const existing = this.fileTools.readFile(path);
-        this.fileTools.writeFile(path + '.backup', existing);
+        backup = this.fileTools.readFile(path);
+        this.fileTools.writeFile(path + '.backup', backup);
       } catch { /* no existing file */ }
 
       // Ensure game.js always ends with init call
       let finalContent = content;
       if (path.endsWith('.js')) {
         finalContent = this.ensureInitCall(finalContent);
+
+        // Syntax check — if the new code has errors, rollback to backup
+        const syntaxOk = this.checkJsSyntax(finalContent);
+        if (!syntaxOk && backup) {
+          this.emit('fragment_done', {
+            id: 'syntax-rollback',
+            content: `Syntax error detected in ${path} — rolling back to backup`,
+            tokensOut: 0,
+            tokPerSec: 0,
+          });
+          finalContent = backup;
+        }
       }
 
       this.fileTools.writeFile(path, finalContent);
@@ -393,5 +410,22 @@ export class FormedBuilder extends EventEmitter {
 
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Check JS syntax using Node's --check flag.
+   * Writes to a temp file, runs node --check, returns true if valid.
+   */
+  private checkJsSyntax(code: string): boolean {
+    const tmpFile = join(tmpdir(), 'gameforge-syntax-check-' + Date.now() + '.js');
+    try {
+      writeFileSync(tmpFile, code);
+      execFileSync('node', ['--check', tmpFile], { stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      try { unlinkSync(tmpFile); } catch { /* ignore */ }
+    }
   }
 }
