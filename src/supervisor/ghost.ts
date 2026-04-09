@@ -138,9 +138,9 @@ ${this.smartConfig.gameDesign.substring(0, 4000)}`,
     return null;
   }
 
-  getStallMessage(stepTitle: string, criteria: string): string {
-    const bullets = criteria
-      .split('\n')
+  getStallMessage(stepTitle: string, criteria: string | string[]): string {
+    const lines = Array.isArray(criteria) ? criteria : criteria.split('\n');
+    const bullets = lines
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => `- ${line}`)
