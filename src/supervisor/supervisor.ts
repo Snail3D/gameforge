@@ -47,6 +47,7 @@ export class Supervisor extends EventEmitter {
   private startTime: number = 0;
   private cycles: number = 0;
   private loopsCaught: number = 0;
+  private stallFiredForStep: number = -1;
 
   constructor(options: SupervisorOptions) {
     super();
@@ -156,7 +157,7 @@ export class Supervisor extends EventEmitter {
     this.feeder = new StepFeeder(plan.buildSteps);
     this.fileTools = this.fileTools ?? new FileTools(this.gameDir);
 
-    this.heartbeat = new Heartbeat(30000, () => this.handleStall());
+    this.heartbeat = new Heartbeat(120000, () => this.handleStall());
     this.heartbeat.start();
 
     const promptsDir = resolve(process.cwd(), 'src/prompts');
@@ -437,16 +438,20 @@ export class Supervisor extends EventEmitter {
     const step = this.feeder?.currentStep();
     if (!step || !this.ghost) return;
 
+    // Only fire stall once per step to avoid spamming
+    if (this.stallFiredForStep === step.stepId) return;
+    this.stallFiredForStep = step.stepId;
+
     const message = this.ghost.getStallMessage(
       step.title,
-      step.acceptanceCriteria.join('\n'),
+      step.acceptanceCriteria,
     );
 
     this.emitEvent({
       type: 'ghost_intervention',
       ts: new Date().toISOString(),
       agent: 'ghost',
-      model: this.config.ollama.models.builder,
+      model: 'none',
       trigger: 'stall',
       pattern: 'heartbeat_stall',
       response: message,
