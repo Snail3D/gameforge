@@ -82,9 +82,8 @@ export class RecipeGenerator extends EventEmitter {
     );
 
     // Canvas and visual setup
-    const canvasSize = await ask(
-      'What canvas size should this game use? Answer with just two numbers: width height (e.g., "400 400" for a square board, "800 600" for a landscape game).'
-    );
+    // Standard canvas size — hardcoded, don't let the model choose
+    const canvasSize = '800 600';
 
     const visualStyle = await ask(
       'How should the game board/field be drawn? Describe the exact drawing steps using canvas 2D API: fillRect, strokeRect, arc, fillText, etc. Be specific about colors (hex values), coordinates, and sizes.'
@@ -149,7 +148,7 @@ Game: ${gamePrompt}
 ${answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n')}
 
 Rules for steps:
-- Step 1 MUST create index.html (with canvas, dark background, viewport meta, script tag loading game.js) AND game.js (with canvas setup: getElementById, getContext, width/height constants)
+- Step 1 MUST create index.html (with canvas 800x600, dark background, viewport meta, <script src="game.js"></script>) AND game.js (with canvas setup: canvas.width=800, canvas.height=600). Canvas is ALWAYS 800x600. No exceptions.
 - Each subsequent step adds ONE feature to game.js
 - Every step must produce a visible change on screen
 - Include the EXACT algorithm/code for each step in the task description — don't say "implement collision", say exactly how
