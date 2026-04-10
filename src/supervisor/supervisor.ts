@@ -684,9 +684,10 @@ export class Supervisor extends EventEmitter {
       // Execute all fragments
       const result = await formedBuilder.executeStep(formedStep);
 
-      // If syntax rollback happened, this step failed — retry
+      // If syntax rollback happened, this step failed — retry with the actual error
       if (!result.success) {
-        criticFeedback = 'The code you wrote had a syntax error and was rolled back. Try again — write only valid JavaScript. Do not use void return types, do not redeclare existing variables.';
+        const syntaxErr = formedBuilder.getLastSyntaxError();
+        criticFeedback = `SYNTAX ERROR — your code was rolled back. The error was:\n${syntaxErr}\n\nFix this and try again. Write ONLY valid JavaScript. Do not use void, do not redeclare const/let variables that already exist.`;
         continue;
       }
 

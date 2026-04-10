@@ -438,16 +438,24 @@ export class FormedBuilder extends EventEmitter {
    * Check JS syntax using Node's --check flag.
    * Writes to a temp file, runs node --check, returns true if valid.
    */
+  private lastSyntaxError: string = '';
+
   private checkJsSyntax(code: string): boolean {
     const tmpFile = join(tmpdir(), 'gameforge-syntax-check-' + Date.now() + '.js');
     try {
       writeFileSync(tmpFile, code);
       execFileSync('node', ['--check', tmpFile], { stdio: 'pipe' });
+      this.lastSyntaxError = '';
       return true;
-    } catch {
+    } catch (err: any) {
+      this.lastSyntaxError = (err.stderr || err.message || 'Unknown syntax error').toString().substring(0, 200);
       return false;
     } finally {
       try { unlinkSync(tmpFile); } catch { /* ignore */ }
     }
+  }
+
+  getLastSyntaxError(): string {
+    return this.lastSyntaxError;
   }
 }
