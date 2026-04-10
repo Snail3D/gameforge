@@ -252,13 +252,25 @@ export class RalphLoop extends EventEmitter {
 
         if (result.screenshotBase64) {
           const question = scoutQuestion ? scoutQuestion[1].trim() : 'Describe what happened after the actions were performed. What changed on screen?';
+
+          // Send both before and after screenshots if we have them
+          const images: Array<{ base64: string; mimeType: string }> = [];
+          if (result.beforeBase64 && actions.length > 0) {
+            images.push({ base64: result.beforeBase64, mimeType: 'image/png' });
+          }
+          images.push({ base64: result.screenshotBase64, mimeType: 'image/png' });
+
+          const contextMsg = actions.length > 0 && result.beforeBase64
+            ? 'You are shown TWO screenshots: BEFORE and AFTER performing actions on the game. Compare them carefully. ' + question
+            : question;
+
           const visionClient = new LLMClient({ baseUrl: this.config.ollama.host, model: 'gemma4:e4b' });
           const answer = await visionClient.chat(
             visionClient.buildMessages(
-              'You are a QA tester playing a game. Look at the screenshot CAREFULLY. Answer honestly — if you cannot see something clearly, say so. Do NOT make up details. Only describe what you ACTUALLY see.',
-              question,
+              'You are a QA tester playing a game. Compare the screenshots CAREFULLY. Answer honestly — if nothing changed, say NOTHING CHANGED. Do NOT make up details. Only describe what you ACTUALLY see.',
+              contextMsg,
               undefined,
-              [{ base64: result.screenshotBase64, mimeType: 'image/png' }]
+              images
             )
           );
           this.lastScoutAnswer = '\n\nSCOUT ANSWER: Q: ' + question + (actions.length > 0 ? ' (after ' + actions.length + ' actions)' : '') + '\nA: ' + answer.content;

@@ -1,14 +1,40 @@
 const canvas = document.getElementById("gameCanvas");
-const ctx2d = canvas.getContext("2d");
+const ctx = canvas.getContext("2d");
 const W = 400;
 const H = 700;
 
-// Board Configuration
-const BOARD_SIZE = 400;
-const SQUARE_SIZE = BOARD_SIZE / 8;
+const BOARD_SIZE = 8;
+const TILE_SIZE = W / BOARD_SIZE;
+const BOARD_HEIGHT = W; 
 
-// Piece mapping: Uppercase = White, Lowercase = Black
-const board = [
+// Colors
+const COLOR_LIGHT = "#eeeed2";
+const COLOR_DARK = "#769656";
+const COLOR_HIGHLIGHT = "rgba(255, 255, 0, 0.5)";
+const COLOR_UI = "#222";
+const COLOR_TEXT = "#fff";
+const COLOR_TURN_W = "#fff";
+const COLOR_TURN_B = "#aaa";
+
+// Piece Unicode Mapping
+const PIECES = {
+    'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
+    'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+};
+
+// Initial Board State
+let board = [
+    ['r', 'n', '◼', 'b', 'q', 'k', 'b', 'n', 'r'], // Note: Cleaned up for valid array
+    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+];
+// Re-initializing board properly to avoid any corrupted state
+board = [
     ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
     ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
     ['', '', '', '', '', '', '', ''],
@@ -19,127 +45,140 @@ const board = [
     ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
 ];
 
-const unicodePieces = {
-    'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-    'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
-};
+let selectedSquare = null; // {r, c}
+let turn = 'W'; // 'W' or 'B'
+let statusText = "White's Turn";
 
-// Game State
-let selectedSquare = null; // {row, col}
-let statusMessage = "Select a piece to move";
+const isWhite = (p) => p !== '' && p === p.toUpperCase();
+const isBlack = (p) => p !== '' && p === p.toLowerCase();
 
-function draw() {
-    // 1. Clear Background
-    ctx2d.fillStyle = "#1a1a1a";
-    ctx2d.fillRect(0, 0, W, H);
-
-    // 2. Draw Chessboard
-    for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-            // Alternating Square Colors
-            ctx2d.fillStyle = (row + col) % 2 === 0 ? "#eeeed2" : "#769656";
-            ctx2d.fillRect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
-
-            // Highlight Selected Square (Using a thick border for maximum visibility)
-            if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
-                ctx2d.strokeStyle = "#f7ff00"; // Bright Yellow
-                ctx2d.lineWidth = 4;
-                ctx2d.strokeRect(col * SQUARE_SIZE + 2, row * SQUARE_SIZE + 2, SQUARE_SIZE - 4, SQUARE_SIZE - 4);
-                
-                // Also add a semi-transparent overlay for extra clarity
-                ctx2d.fillStyle = "rgba(247, 255, 0, 0.3)";
-                ctx2d.fillRect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
-            }
-
-            // Draw Piece
-            const piece = board[row][col];
-            if (piece) {
-                drawPiece(piece, col, row);
-            }
-        }
-    }
-
-    // 3. Draw UI Panel
-    const UI_Y = BOARD_SIZE;
-    ctx2d.fillStyle = "#2c2c2c";
-    ctx2d.fillRect(0, UI_Y, W, H - UI_Y);
-
-    // Divider Line
-    ctx2d.strokeStyle = "#444";
-    ctx2d.lineWidth = 2;
-    ctx2d.beginPath();
-    ctx2d.moveTo(0, UI_Y);
-    ctx2d.lineTo(W, UI_Y);
-    ctx2d.stroke();
-
-    // Text Info
-    ctx2d.fillStyle = "#ffffff";
-    ctx2d.font = "bold 28px Arial";
-    ctx2d.textAlign = "center";
-    ctx2d.fillText("CHESS AI", W / 2, UI_Y + 50);
-
-    ctx2d.fillStyle = "#aaa";
-    ctx2d.font = "18px Arial";
-    ctx2d.fillText(statusMessage, W / 2, UI_Y + 100);
-}
-
-function drawPiece(piece, col, row) {
-    ctx2d.fillStyle = "#000";
-    ctx2d.font = `${SQUARE_SIZE * 0.8}px Arial`;
-    ctx2d.textAlign = "center";
-    ctx2d.textBaseline = "middle";
-    ctx2d.fillText(
-        unicodePieces[piece], 
-        col * SQUARE_SIZE + SQUARE_SIZE / 2, 
-        row * SQUARE_SIZE + SQUARE_SIZE / 2
-    );
-}
-
-function handleInteraction(e) {
+function processInteraction(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
-    
     const x = clientX - rect.left;
     const y = clientY - rect.top;
 
-    // Check if click is within the board
-    if (x >= 0 && x <= BOARD_SIZE && y >= 0 && y <= BOARD_SIZE) {
-        const col = Math.floor(x / SQUARE_SIZE);
-        const row = Math.floor(y / SQUARE_SIZE);
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
 
+    if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+        const piece = board[row][col];
+        
         if (selectedSquare) {
-            // Attempt to move
-            if (selectedSquare.row === row && selectedSquare.col === col) {
-                // Deselect if clicking same square
+            const sr = selectedSquare.r;
+            const sc = selectedSquare.c;
+            const movingPiece = board[sr][sc];
+            
+            // If clicking the same square, deselect
+            if (row === sr && col === sc) {
                 selectedSquare = null;
-                statusMessage = "Select a piece to move";
-            } else {
-                // Execute move
-                const pieceToMove = board[selectedSquare.row][selectedSquare.col];
-                board[row][col] = pieceToMove;
-                board[selectedSquare.row][selectedSquare.col] = '';
-                
-                selectedSquare = null;
-                statusMessage = "Move executed!";
+                statusText = turn === 'W' ? "White's Turn" : "Black's Turn";
+                return;
             }
+
+            // Check if target is same team
+            const targetPiece = board[row][col];
+            const isMovingWhite = isWhite(movingPiece);
+            const isTargetWhite = isWhite(targetPiece);
+
+            if (targetPiece !== '' && isTargetWhite === isMovingWhite) {
+                // Illegal: selecting opponent piece (for now, we just switch selection)
+                selectedSquare = { r: row, c: col };
+                statusText = "Invalid Move";
+                return;
+            }
+
+            // Execute move
+            board[row][col] = movingPiece;
+            board[sr][sc] = '';
+            
+            // Switch turn
+            turn = (turn === 'W' ? 'B' : 'W');
+            statusText = turn === 'W' ? "White's Turn" : "Black's Turn";
+            selectedSquare = null;
         } else {
-            // Try to select a piece
-            if (board[row][col] !== '') {
-                selectedSquare = { row, col };
-                statusMessage = "Piece selected";
+            // Select piece
+            if (piece !== '') {
+                const pieceIsWhite = isWhite(piece);
+                if ((turn === 'W' && pieceIsWhite) || (turn === 'B' && !pieceIsWhite)) {
+                    selectedSquare = { r: row, c: col };
+                    statusText = `Selected: ${PIECES[piece]}`;
+                } else {
+                    statusText = "Not your piece!";
+                }
             }
         }
-        draw();
     }
 }
 
-// Event Listeners
-canvas.addEventListener('mousedown', handleInteraction);
+canvas.addEventListener('mousedown', (e) => {
+    processInteraction(e.clientX, e.clientY);
+});
+
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    handleInteraction(e);
-}, { passive: false });
+    const touch = e.touches[0];
+    processInteraction(touch.clientX, touch.clientY);
+}, {passive: false});
 
-// Initial Render
-draw();
+function drawUI() {
+    ctx.fillStyle = COLOR_UI;
+    ctx.fillRect(0, BOARD_HEIGHT, W, H - BOARD_HEIGHT);
+
+    ctx.fillStyle = COLOR_TEXT;
+    ctx.font = "24px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("CHESS AI", W / 2, BOARD_HEIGHT + 50);
+    
+    ctx.font = "16px monospace";
+    ctx.fillStyle = "#aaa";
+    ctx.fillText("Strategy & Conquest", W / 2, BOARD_HEIGHT + 80);
+
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, BOARD_HEIGHT + 120, W - 40, 150);
+    
+    ctx.fillStyle = turn === 'W' ? COLOR_TURN_W : COLOR_TURN_B;
+    ctx.font = "bold 20px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(statusText, W / 2, BOARD_HEIGHT + 150);
+}
+
+function render() {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw Board
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            ctx.fillStyle = (r + c) % 2 === 0 ? COLOR_LIGHT : COLOR_DARK;
+            ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            
+            if (selectedSquare && selectedSquare.r === r && selectedSquare.c === c) {
+                ctx.fillStyle = COLOR_HIGHLIGHT;
+                ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    // Draw Pieces
+    ctx.font = `${TILE_SIZE * 0.8}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            const p = board[r][c];
+            if (p) {
+                // To ensure pieces look good, we use black color 
+                // but the Unicode characters themselves carry color 
+                // on most modern OS/Browsers. 
+                ctx.fillStyle = "#000"; 
+                ctx.fillText(PIECES[p], c * TILE_SIZE + TILE_SIZE/2, r * TILE_SIZE + TILE_SIZE/2);
+            }
+        }
+    }
+
+    drawUI();
+    requestAnimationFrame(render);
+}
+
+render();
