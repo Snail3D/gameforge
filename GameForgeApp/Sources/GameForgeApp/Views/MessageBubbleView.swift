@@ -4,7 +4,7 @@ struct MessageBubbleView: View {
     let message: AgentMessage
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(agentIcon(message.agent) + " " + message.agent.uppercased())
                     .font(.system(.caption2, design: .monospaced))
@@ -16,19 +16,43 @@ struct MessageBubbleView: View {
                 if message.tokPerSec > 0 {
                     Text(String(format: "%.1f tok/s", message.tokPerSec))
                         .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.forgeGreen.opacity(0.5))
                 }
             }
 
             if message.isToolCall {
                 Text(message.content)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.forgeGreen)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.black.opacity(0.4))
+                    )
             } else {
                 Text(message.content)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.primary)
                     .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxHeight: 300)
+            }
+
+            // Screenshot thumbnail
+            if let base64 = message.screenshotBase64,
+               let data = Data(base64Encoded: base64),
+               let nsImage = NSImage(data: data) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 280, maxHeight: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(agentColor(message.agent).opacity(0.4), lineWidth: 1)
+                    )
+                    .padding(.top, 2)
             }
 
             HStack {
@@ -40,17 +64,27 @@ struct MessageBubbleView: View {
             .font(.system(.caption2, design: .monospaced))
             .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(message.agent == "ghost"
-                    ? Color.blue.opacity(0.05)
-                    : Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 6)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            agentColor(message.agent).opacity(0.06),
+                            Color(nsColor: .controlBackgroundColor).opacity(0.5)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
         .overlay(alignment: .leading) {
-            Rectangle().fill(agentColor(message.agent)).frame(width: 3)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(agentColor(message.agent))
+                .frame(width: 3)
+                .padding(.vertical, 2)
         }
     }
 }
