@@ -12,9 +12,10 @@ const prompt = args.filter(a => !a.startsWith('--')).join(' ') || 'Make a fun br
 const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
 const timer = timerStr ? parseInt(timerStr, 10) : 120;
 const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
-const useFormed = args.includes('--formed') || preset === 'e4b' || preset === 'e2b';
-const useRecipe = args.includes('--recipe') || preset === 'e4b' || preset === 'e2b';
-const skipCritic = args.includes('--no-critic') || preset === 'e4b' || preset === 'e2b';
+const localPresets = ['e4b', 'e2b', 'qwopus', 'oss120b', 'single'];
+const useFormed = args.includes('--formed') || localPresets.includes(preset);
+const useRecipe = args.includes('--recipe') || localPresets.includes(preset);
+const skipCritic = args.includes('--no-critic') || localPresets.includes(preset);
 
 const config = loadConfig({ preset });
 
