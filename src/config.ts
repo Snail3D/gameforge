@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 
-export type ModelPreset = 'dual' | 'single' | 'e4b' | 'e2b';
+export type ModelPreset = 'dual' | 'single' | 'e4b' | 'e2b' | 'minimax';
 
 export interface ReviewerProvider {
   baseUrl: string;
@@ -11,6 +11,7 @@ export interface ReviewerProvider {
 export interface GameForgeConfig {
   ollama: {
     host: string;
+    apiKey?: string;  // For cloud providers
     models: {
       planner: string;
       builder: string;
@@ -67,12 +68,26 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
       critic: 'gemma4:e2b',
       scout: 'gemma4:e2b',
     },
+    // MiniMax cloud — everything runs on MiniMax M2.7, zero local GPU
+    minimax: {
+      planner: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+      builder: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+      reviewer: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+      critic: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+      scout: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+    },
   };
+
+  // For minimax preset, override host to MiniMax API
+  const host = preset === 'minimax'
+    ? (process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io/v1')
+    : (process.env['OLLAMA_HOST'] ?? 'http://localhost:11434');
 
   return {
     ollama: {
-      host: process.env['OLLAMA_HOST'] ?? 'http://localhost:11434',
+      host,
       models: presets[preset],
+      ...(preset === 'minimax' ? { apiKey: process.env['MINIMAX_API_KEY'] } : {}),
     },
     dashboard: {
       port: parseInt(process.env['DASHBOARD_PORT'] ?? '9191', 10),

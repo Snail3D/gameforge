@@ -109,7 +109,7 @@ export class Supervisor extends EventEmitter {
       await this.modelManager.loadModel(plannerModel);
 
       const generator = new RecipeGenerator({
-        client: new LLMClient({ baseUrl: this.config.ollama.host, model: plannerModel }),
+        client: new LLMClient({ baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey, model: plannerModel, apiKey: this.config.ollama.apiKey }),
       });
 
       // Wire recipe events to dashboard
@@ -191,7 +191,7 @@ export class Supervisor extends EventEmitter {
     const plannerSystemPrompt = readFileSync(plannerPromptPath, 'utf-8');
 
     const plannerClient = new LLMClient({
-      baseUrl: this.config.ollama.host,
+      baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
       model: plannerModel,
     });
 
@@ -257,7 +257,7 @@ export class Supervisor extends EventEmitter {
     // Use MiniMax for Ghost smart answers if available, otherwise local scout model
     const ghostConfig = this.config.reviewer
       ? { baseUrl: this.config.reviewer.baseUrl, model: this.config.reviewer.model, apiKey: this.config.reviewer.apiKey, gameDesign: plan.gameDesign }
-      : { baseUrl: this.config.ollama.host, model: this.config.ollama.models.scout, gameDesign: plan.gameDesign };
+      : { baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey, model: this.config.ollama.models.scout, gameDesign: plan.gameDesign };
     this.ghost = new Ghost(plan.ghost as GhostDatabase, ghostConfig);
     this.loopDetector = new LoopDetector();
     this.miniLoop = new MiniLoop();
@@ -273,7 +273,7 @@ export class Supervisor extends EventEmitter {
     const criticPrompt = readFileSync(join(promptsDir, 'critic.md'), 'utf-8');
 
     const builderClient = new LLMClient({
-      baseUrl: this.config.ollama.host,
+      baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
       model: builderModel,
     });
 
@@ -441,8 +441,9 @@ export class Supervisor extends EventEmitter {
             apiKey: this.config.reviewer.apiKey,
           })
         : new LLMClient({
-            baseUrl: this.config.ollama.host,
+            baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
             model: reviewerModel,
+            apiKey: this.config.ollama.apiKey,
           });
 
       // Build reviewer context with actual file contents
@@ -528,7 +529,7 @@ export class Supervisor extends EventEmitter {
 
       // Critic
       const criticClient = new LLMClient({
-        baseUrl: this.config.ollama.host,
+        baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
         model: criticModel,
       });
 
@@ -747,8 +748,9 @@ export class Supervisor extends EventEmitter {
             apiKey: this.config.reviewer.apiKey,
           })
         : new LLMClient({
-            baseUrl: this.config.ollama.host,
+            baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
             model: reviewerModel,
+            apiKey: this.config.ollama.apiKey,
           });
 
       let reviewContext = `Review for step "${step.title}":\n\n`;
@@ -828,7 +830,7 @@ export class Supervisor extends EventEmitter {
 
       // Critic
       const criticClient = new LLMClient({
-        baseUrl: this.config.ollama.host,
+        baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey,
         model: criticModel,
       });
 
