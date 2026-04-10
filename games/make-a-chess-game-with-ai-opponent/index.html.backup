@@ -6,20 +6,60 @@
     <title>Chess GameForge</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box }
-        body { background: #282c34; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: sans-serif; }
-        /* The canvas now acts as the main container */
-        #gameCanvas { 
-            background: transparent; 
-            border: 8px solid #333; 
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
-            /* Adjusting sizing to fit the goal: A main game view */
-            width: 400px; 
-            height: 700px;
+        body { 
+            background: #111; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            margin: 0; 
+            font-family: sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+        canvas { 
+            background: #000; 
+            /* Using max dimensions derived from the fixed calculation size (400x700) */
+            width: 95vw; 
+            max-width: 400px; 
+            height: calc(95vw * (700 / 400)); /* Maintain original 4:7 aspect ratio */
+            max-height: 700px; 
+            display: block; 
+            touch-action: manipulation;
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="400" height="700"></canvas>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="700"></canvas>
+        <div id="controls">
+            <button id="resetBtn">New Game</button>
+        </div>
+    </div>
     <script src="game.js"></script>
 </body>
 </html>

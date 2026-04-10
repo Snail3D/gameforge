@@ -138,9 +138,24 @@ export class RalphLoop extends EventEmitter {
       }
     } catch {}
 
+    // Check if any file is too large — if so, tell model to split
+    let fileSizeWarning = '';
+    try {
+      for (const f of this.fileTools.listFiles()) {
+        if (f.endsWith('.backup') || f.includes('_meta')) continue;
+        try {
+          const lines = this.fileTools.readFile(f).split('\n').length;
+          if (lines > 250) {
+            fileSizeWarning = '\n\nWARNING: ' + f + ' is ' + lines + ' lines — TOO BIG. This cycle you MUST split it into multiple smaller files (under 200 lines each). Move related functions into separate files (e.g., board.js, pieces.js, moves.js, ai.js). Update index.html to load all files with <script> tags in the right order. Global variables and constants go in the first file loaded.';
+            break;
+          }
+        } catch {}
+      }
+    } catch {}
+
     const prompt = this.cycle === 0
       ? 'Build this game from scratch: "' + this.userPrompt + '"\n\nMake something visible immediately. Current files:\n' + gameFiles
-      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Add the next feature or fix the biggest issue.' + visionDescription + '\n\nCurrent files:\n' + gameFiles;
+      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Add the next feature or fix the biggest issue.' + visionDescription + fileSizeWarning + '\n\nCurrent files:\n' + gameFiles;
 
     this.emitEvent({ type: 'step_assign', ts: new Date().toISOString(), agent: 'supervisor', model: 'none', stepId: String(this.cycle + 1), title: 'Cycle ' + (this.cycle + 1) });
 
