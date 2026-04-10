@@ -44,13 +44,13 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
       critic: 'gemma4:moe-chat',
       scout: 'gemma4:e4b',
     },
-    // Single MoE model for everything
+    // MoE builds, E4B reviews (better vision for screenshots)
     single: {
       planner: 'gemma4:moe-chat',
       builder: 'gemma4:moe-chat',
-      reviewer: 'gemma4:moe-chat',
-      critic: 'gemma4:moe-chat',
-      scout: 'gemma4:moe-chat',
+      reviewer: 'gemma4:e4b',
+      critic: 'gemma4:e4b',
+      scout: 'gemma4:e4b',
     },
     // E4B only — runs on 16GB devices
     e4b: {

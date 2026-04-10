@@ -1,0 +1,340 @@
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const canvasWidth = 400;
+const canvasHeight = 700;
+
+const state = {
+    turn_count: 1,
+    player_score: 0,
+    ai_score: 0,
+    game_phase: 'PLAYER_TURN',
+    ai_heatmap: Array.from({length: 10}, () => Array.from({length: 10}, () => 0.5))
+};
+
+const player_grid = Array.from({length: 10}, () => Array.from({length: 10}, () => ({state: "EMPTY"})));
+const ai_grid = Array.from({length: 10}, () => Array.from({length: 10}, () => ({state: "EMPTY"})));
+const gridConfig = { cellSize: 20, originX: 100, originY: 150 };
+
+const AI_TARGET = {x: 5, y: 5};
+const player_fleet = [{ 
+    name: "Carrier", 
+    length: 5, 
+    current_hp: 5, 
+    status: 'ALIVE',
+    coordinates: [{x:0,y:0},{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0}] 
+}];
+
+// Mirroring AI fleet for logic symmetry
+const ai_fleet = [{ 
+    name: "Submarine", 
+    length: 3, 
+    current_hp: 3, 
+    status: 'ALIVE',
+    coordinates: [{x:5,y:5},{x:5,y:6},{x:5,y:7}] 
+}];
+
+const shot_history = [];
+
+class MCTSNode {
+    constructor(x, y, parent = null) {
+        this.x = x;
+        this.y = y;
+        this.parent = parent;
+        this.children = [];
+        this.visits = 0;
+        this.wins = 0;
+        this.isExpanded = false;
+    }
+
+    getUCB1(parentVisits) {
+        if (this.visits === 0) return Infinity;
+        return (this.wins / this.visits) + 1.41 * Math.sqrt(Math.log(parentVisits) / this.visits);
+    }
+}
+
+function select_logic(node) {
+    let curr = node;
+    while (curr.children.length > 0 && curr.isExpanded) {
+        let bestUCB = -Infinity;
+        let selectedChild = null;
+        for (const child of curr.children) {
+            const ucb = child.getUCB1(curr.visits);
+            if (ucb > bestUCB) {
+                bestUCB = ucb;
+                selectedChild = child;
+            }
+        }
+        if (!selectedChild) break;
+        curr = selectedChild;
+    }
+    return curr;
+}
+
+function expand_logic(node) {
+    const x = Math.floor(Math.random() * 10);
+    const y = Math.floor(Math.random() * 10);
+    
+    const exists = node.children.some(c => c.x === x && c.y === y);
+    if (!exists) {
+        const newNode = new MCTSNode(x, y, node);
+        node.children.push(newNode);
+        node.isExpanded = true;
+        return newNode;
+    }
+    return node;
+}
+
+function simulate(node) {
+    const distToTarget = Math.sqrt(Math.pow(node.x - AI_TARGET.x, 2) + Math.pow(node.y - AI_TARGET.y, 2));
+    const heatmapVal = state.ai_heatmap[node.y][node.x];
+    const reward = (1 / (distToTarget + 1)) * 0.7 + (heatmapVal * 0.3);
+    return Math.random() < reward ? 1 : 0;
+}
+
+function backpropute_logic(node, result) {
+    let curr = node;
+    while (curr !== null) {
+        curr.visits++;
+        curr.wins += result;
+        curr = curr.parent;
+    }
+}
+
+function Compute_AI_Move() {
+    const root = new MCTSNode(-1, -1);
+    const iterations = 100;
+
+    for (let i = 0; i < iterations; i++) {
+        let node = select_logic(root);
+        node = expand_logic(node);
+        const result = simulate(node);
+        backpropute_logic(node, result);
+    }
+
+    let bestChild = null;
+    let maxVisits = -1;
+    for (const child of root.children) {
+        if (child.visits > maxVisits) {
+            maxVisits = child.visits;
+            bestChild = child;
+        }
+    }
+
+    if (bestChild) {
+        return { x: bestChild.x, y: bestChild.y };
+    } else {
+        return { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) };
+    }
+}
+
+function countHitsInRadius(targetX, targetY) {
+    let hits = 0;
+    const radius = 1;
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            const nx = targetX + dx;
+            const ny = targetY + dy;
+            if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10) {
+                if (ai_grid[ny][nx].state === 'HIT') {
+                    hits++;
+                }
+            }
+        }
+    }
+    return hits;
+}
+
+function countShotsInRadius(targetX, targetY) {
+    let shots = 0;
+    const radius = 1;
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            const nx = targetX + dx;
+            const ny = targetY + dy;
+            if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10) {
+                const wasShot = shot_history.some(s => s.x === nx && s.y === ny);
+                if (wasShot) {
+                    shots++;
+                }
+            }
+        }
+    }
+    return shots;
+}
+
+function updateBayesianInference() {
+    for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 10; j++) {
+            let hits = countHitsInRadius(i, j);
+            let shots = countShotsInRadius(i, j);
+            state.ai_heatmap[j][i] = (hits + 1) / (shots + 2);
+        }
+    }
+}
+
+async function Fire(gridX, gridY) {
+    if (gridX < 0 || gridX >= 10 || gridY < 0 || gridY >= 10) return;
+    if (state.game_phase !== 'PLAYER_TURN') return;
+
+    const target_cell = ai_grid[gridY][gridX];
+    shot_history.push({x: gridX, y: gridY});
+    
+    // Check Player Attack vs AI Fleet
+    let hitFound = false;
+    for (let ship of ai_fleet) {
+        if (ship.status !== 'SUNK' && ship.coordinates.some(c => c.x === gridX && c.y === gridY)) {
+            ship.current_hp -= 1;
+            hitFound = true;
+            if (ship.current_hp <= 0) {
+                ship.status = 'SUNK';
+            }
+            break;
+        }
+    }
+
+    if (hitFound) {
+        target_cell.state = 'HIT';
+        state.player_score++;
+    } else {
+        target_cell.state = 'MISS';
+    }
+    
+    updateBayesianInference();
+    state.game_phase = 'RESOLVING';
+    
+    setTimeout(async () => {
+        const move = Compute_AI_Move();
+        
+        // AI Attack vs Player Fleet
+        const ai_target_cell = player_grid[move.y][move.x];
+        let aiHitFound = false;
+        for (let ship of player_fleet) {
+            if (ship.status !== 'SUNK' && ship.coordinates.some(c => c.x === move.x && c.y === move.y)) {
+                ship.current_hp -= 1;
+                aiHitFound = true;
+                if (ship.current_hp <= 0) {
+                    ship.status = 'SUNK';
+                }
+                break;
+            }
+        }
+
+        // Update AI scoring and grid visual
+        const ai_grid_cell = ai_grid[move.y][move.x];
+        if (aiHitFound) {
+            ai_grid_cell.state = 'HIT';
+            state.ai_score++;
+        } else {
+            ai_grid_cell.state = 'MISS';
+        }
+        
+        player_grid[move.y][move.x].state = aiHitFound ? 'HIT' : 'MISS';
+
+        state.turn_count++;
+        state.game_phase = 'PLAYER_TURN';
+    }, 600);
+}
+
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const actualX = Math.floor((mouseX - gridConfig.originX) / gridConfig.cellSize);
+    const actualY = Math.floor((mouseY - gridConfig.originY) / gridConfig.cellSize);
+
+    if (actualX >= 0 && actualX < 10 && actualY >= 0 && actualY < 10) {
+        Fire(actualX, actualY);
+    }
+});
+
+function update() {}
+
+function render() {
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    for (let i = 0; i < canvasHeight; i += 3) {
+        ctx.fillRect(0, i, canvasWidth, 1);
+    }
+    const grad = ctx.createRadialGradient(200, 350, 100, 200, 350, 400);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    const { originX, originY } = gridConfig;
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(originX + (i * 20), originY);
+        ctx.lineTo(originX + (i * 20), originY + 200);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(originX, originY + (i * 20));
+        ctx.lineTo(originX + 200, originY + (i * 20));
+        ctx.stroke();
+    }
+
+    for (let y = 0; y < 10; y++) {
+        for (let x = 0; x < 10; x++) {
+            const cell = ai_grid[y][x];
+            const cellX = originX + (x * 20);
+            const cellY = originPointsY = originY + (y * 20);
+            const intensity = state.ai_heatmap[y][x];
+            if (intensity > 0) {
+                ctx.fillStyle = 'rgba(0, 255, 255, ' + (Math.min(intensity * 0.8, 1.0)) + ')';
+                ctx.fillRect(cellX, cellY, 20, 20);
+            }
+            if (cell.state === 'HIT') {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#FF00FF';
+                ctx.fillStyle = '#FF00FF';
+                ctx.fillRect(cellX + 5, cellY + 5, 10, 10);
+                ctx.shadowBlur = 0;
+            } else if (cell.state === 'MISS') {
+                ctx.fillStyle = '#004400';
+                ctx.beginPath();
+                ctx.arc(cellX + 10, cellY + 10, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    player_fleet.forEach(ship => {
+        const isSunk = ship.status === 'SUNK';
+        const glitch = isSunk && Math.random() > 0.7;
+
+        ship.coordinates.forEach(coord => {
+            const drawX = originX + (coord.x * 20);
+            const drawY = originY + (coord.y * 20);
+            
+            if (glitch) {
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 3;
+            } else {
+                ctx.strokeStyle = '#00FFFF';
+                ctx.lineWidth = 2;
+            }
+
+            ctx.strokeRect(drawX + 2 + (glitch ? Math.random()*4 : 0), 
+                           drawY + 2 + (glitch ? Math.random()*4 : 0), 
+                           16, 16);
+        });
+    });
+
+    ctx.fillStyle = '#00FFFF';
+    ctx.textAlign = 'center';
+    ctx.font = '16px monospace';
+    ctx.fillText('TURN: ' + state.turn_count, 200, 50);
+    ctx.fillText('PLAYER: ' + state.player_score + ' | AI: ' + state.ai_score, 200, 80);
+    ctx.fillText('PHASE: ' + state.game_phase, 200, 110);
+}
+
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
