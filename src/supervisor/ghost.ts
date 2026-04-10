@@ -30,8 +30,9 @@ export interface WeaknessMatch {
 
 export interface SmartGhostConfig {
   baseUrl: string;
-  model: string;  // e.g. 'gemma4:e4b'
-  gameDesign: string;  // the full PRD
+  model: string;
+  apiKey?: string;  // For cloud providers (MiniMax, etc.)
+  gameDesign: string;
 }
 
 export class Ghost {
@@ -79,9 +80,12 @@ export class Ghost {
     }
 
     try {
-      const res = await fetch(`${this.smartConfig.baseUrl}/v1/chat/completions`, {
+      const res = await fetch(`${this.smartConfig.baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.smartConfig.apiKey ? { 'Authorization': `Bearer ${this.smartConfig.apiKey}` } : {}),
+        },
         body: JSON.stringify({
           model: this.smartConfig.model,
           messages: [

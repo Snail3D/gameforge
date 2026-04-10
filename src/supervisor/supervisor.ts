@@ -254,11 +254,11 @@ export class Supervisor extends EventEmitter {
     const builderModel = this.config.ollama.models.builder;
     await this.modelManager.loadModel(builderModel);
 
-    this.ghost = new Ghost(plan.ghost as GhostDatabase, {
-      baseUrl: this.config.ollama.host,
-      model: this.config.ollama.models.scout,  // E4B for smart answers
-      gameDesign: plan.gameDesign,
-    });
+    // Use MiniMax for Ghost smart answers if available, otherwise local scout model
+    const ghostConfig = this.config.reviewer
+      ? { baseUrl: this.config.reviewer.baseUrl, model: this.config.reviewer.model, apiKey: this.config.reviewer.apiKey, gameDesign: plan.gameDesign }
+      : { baseUrl: this.config.ollama.host, model: this.config.ollama.models.scout, gameDesign: plan.gameDesign };
+    this.ghost = new Ghost(plan.ghost as GhostDatabase, ghostConfig);
     this.loopDetector = new LoopDetector();
     this.miniLoop = new MiniLoop();
     this.feeder = new StepFeeder(plan.buildSteps);
