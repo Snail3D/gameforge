@@ -1,83 +1,53 @@
 import 'dotenv/config';
 import { loadConfig } from './config.js';
 import type { ModelPreset } from './config.js';
-import { Supervisor } from './supervisor/supervisor.js';
+import { RalphLoop } from './supervisor/ralph-loop.js';
 import { startDashboard } from './dashboard/server.js';
-import type { Mode } from './logging/event-types.js';
 
 // Parse CLI args
 const args = process.argv.slice(2);
-const mode = (args.find(a => a.startsWith('--mode='))?.split('=')[1] || 'build') as Mode;
 const prompt = args.filter(a => !a.startsWith('--')).join(' ') || 'Make a fun browser game';
-const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
-const timer = timerStr ? parseInt(timerStr, 10) : 120;
-const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
-const smallPresets = ['e4b', 'e2b', 'qwopus', 'single'];  // Need Recipe Generator + FormedBuilder
-const allLocalPresets = ['e4b', 'e2b', 'qwopus', 'oss120b', 'single'];
-const useFormed = args.includes('--formed') || smallPresets.includes(preset);
-const useRecipe = args.includes('--recipe') || smallPresets.includes(preset);
-const skipCritic = args.includes('--no-critic') || allLocalPresets.includes(preset);
+const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'single') as ModelPreset;
 
 const config = loadConfig({ preset });
-
-// Start dashboard
 const dashboard = startDashboard(config.dashboard.port);
 
-// Start supervisor
-const supervisor = new Supervisor({
-  config, mode, userPrompt: prompt, timer,
-  useFormedBuilder: useFormed,
-  useRecipeGenerator: useRecipe,
-  skipCritic: skipCritic,
-});
+// Ralph Loop — one agent, one model, infinite iteration
+const loop = new RalphLoop({ config, mode: 'build', userPrompt: prompt });
 
-// When game directory is created, serve it and tell the dashboard
-supervisor.on('game_ready', (gameDir: string) => {
+loop.on('game_ready', (gameDir: string) => {
   dashboard.serveGameDir(gameDir);
   dashboard.broadcaster.broadcast({
-    type: 'game_ready',
-    ts: new Date().toISOString(),
-    agent: 'supervisor',
-    model: 'none',
-    url: '/game/index.html',
+    type: 'game_ready', ts: new Date().toISOString(),
+    agent: 'supervisor', model: 'none', url: '/game/index.html',
   } as any);
 });
 
-// Wire all events to dashboard
-supervisor.on('event', (event: any) => {
+loop.on('event', (event: any) => {
   dashboard.broadcaster.broadcast(event);
 });
 
-supervisor.on('token', ({ agent, token }) => {
+loop.on('token', ({ agent, token }) => {
   dashboard.broadcaster.broadcast({
-    type: 'token_stream',
-    agent,
-    token,
-    ts: new Date().toISOString(),
+    type: 'token_stream', agent, token, ts: new Date().toISOString(),
   } as any);
 });
 
-// Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\nShutting down GameForge...');
-  supervisor.stop();
+  loop.stop();
   dashboard.close();
   process.exit(0);
 });
 
-// Start
 console.log(`
-  ⚒ GAMEFORGE
-  Mode: ${mode}
+  ⚒ GAMEFORGE — Ralph Loop
   Preset: ${preset}
-  FormedBuilder: ${useFormed ? 'ON' : 'OFF'}
-  RecipeGenerator: ${useRecipe ? 'ON' : 'OFF'}
-  Critic: ${skipCritic ? 'SKIP' : 'ON'}
+  Model: ${config.ollama.models.builder}
   Prompt: ${prompt}
   Dashboard: http://localhost:${config.dashboard.port}
 `);
 
-supervisor.start().catch(err => {
+loop.start().catch(err => {
   console.error('GameForge error:', err);
   process.exit(1);
 });
