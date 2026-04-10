@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+    <title>Chess GameForge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box }
+        body { background: #282c34; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: sans-serif; }
+        /* The canvas now acts as the main container */
+        #gameCanvas { 
+            background: transparent; 
+            border: 8px solid #333; 
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            width: 400px; 
+            height: 700px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="700"></canvas>
+    <script src="game.js"></script>
+</body>
+</html>

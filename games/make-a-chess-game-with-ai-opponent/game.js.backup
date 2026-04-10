@@ -1,0 +1,222 @@
+const canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d"), W = 400, H = 700;
+
+// Chess board dimensions
+const BOARD_SIZE = 8;
+const SQUARE_SIZE = W / 8; // Divide the width by 8 squares
+
+// UI Constants
+const BOARD_HEIGHT = SQUARE_SIZE * BOARD_SIZE; // 400px
+const UI_HEIGHT = H - BOARD_HEIGHT; // 700 - 400 = 300px (Reserved space for status)
+
+/**
+ * Draws utility background rectangles (e.g., active selection highlights).
+ */
+function drawOverlay(x, y, w, h, color = 'rgba(0, 255, 0, 0.3)') {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+}
+
+/**
+ * Draws a single square on the chessboard.
+ * @param {number} row - The row index (0-7, where 0 is the top).
+ * @param {number} col - The column index (0-7, where 0 is the left).
+ * @param {string} color - The background color.
+ */
+function drawSquare(row, col, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
+}
+
+/**
+ * Draws coordinates and piece markers (using Unicode characters).
+ * @param {number} row - The row index.
+ * @param {number} col - The column index.
+ * @param {string} pieceSymbol - The Unicode character for the piece.
+ * @param {string} color - The piece color ("black" or "white").
+ */
+function drawPiece(row, col, pieceSymbol, color) {
+    const centerX = col * SQUARE_SIZE + SQUARE_SIZE / 2;
+    const centerY = row * SQUARE_SIZE + SQUARE_SIZE / 2;
+
+    // Style for the piece container (optional visual glow/base)
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.fillStyle = color === 'white' ? '#fff' : '#333';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, SQUARE_SIZE * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0; // Reset shadow
+
+    ctx.font = `${Math.min(SQUARE_SIZE * 0.7, 28)}px serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = color === 'white' ? '#000' : '#fff';
+
+    ctx.fillText(pieceSymbol, centerX, centerY);
+}
+
+/**
+ * Draws UI elements below the board (Status area).
+ * @param {string} turn - Current turn ('White' or 'Black').
+ * @param {string} statusText - Additional status message.
+ */
+function drawUI() {
+    // 1. Background for the UI Section
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, BOARD_HEIGHT, W, UI_HEIGHT);
+
+    // 2. Draw status elements on the reserved space
+    const padding = 20;
+    const statusAreaY = BOARD_HEIGHT + 20;
+    const textHeight = 30;
+
+    // Turn Indicator
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px Arial';
+    ctx.fillText("TURN:", padding, statusAreaY);
+    ctx.fillStyle = 'gold';
+    ctx.font = '30px Arial';
+    ctx.fillText(turn, padding + 100, statusAreaY);
+    
+    // Move History Placeholder
+    ctx.fillStyle = '#aaa';
+    ctx.font = '16px Arial';
+    ctx.fillText("Move History:", padding + 250, statusAreaY);
+    
+    // Current Selection Placeholder
+    ctx.fillStyle = 'yellow';
+    ctx.font = '16px Arial';
+    ctx.fillText("Selected: None", W - padding - 150, statusAreaY);
+}
+
+
+/**
+ * Initializes and draws the entire structure: Board + UI.
+ */
+function drawBoard() {
+    // 1. Fill the immediate background (canvas context)
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. Draw squares (Top section: 400x400)
+    for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let col = 0; col < BOARD_SIZE; col++) {
+            // Chessboard pattern: A1 is dark, A2 is light, etc.
+            const isDark = (row + col) % 2 === 0;
+            const color = isDark ? '#B88A6D' : '#F0D9B5'; // Standard wood colors
+            drawSquare(row, col, color);
+        }
+    }
+
+    // 3. Place pieces (On top of the drawn squares)
+    const pieces = {
+        'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟', // Black (Uppercase Unicode)
+        'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'  // White (Lowercase Unicode)
+    };
+
+    // Draw Black pieces (Top Rank: Row 0)
+    drawPiece(0, 0, pieces['r'], 'black');
+    drawPiece(0, 1, pieces['n'], 'black');
+    drawPiece(0, 2, pieces['b'], 'black');
+    drawPiece(0, 3, pieces['q'], 'black');
+    drawPiece(0, 4, pieces['k'], 'black');
+    drawPiece(0, 5, pieces['b'], 'black');
+    drawPiece(0, 6, pieces['n'], 'black');
+    drawPiece(0, 7, pieces['r'], 'black');
+
+    // Draw Black Pawns (Second Rank: Row 1)
+    for (let col = 0; col < 8; col++) {
+        drawPiece(1, col, pieces['p'], 'black');
+    }
+
+    // Draw White Pawns (Seventh Rank: Row 6)
+    for (let col = 0; col < 8; col++) {
+        drawPiece(6, col, pieces['p'], 'white');
+    }
+
+    // Draw White Major Pieces (Bottom Rank: Row 7)
+    drawPiece(7, 0, pieces['R'], 'white');
+    drawPiece(7, 1, pieces['N'], 'white');
+    drawPiece(7, 2, pieces['B'], 'white');
+    drawPiece(7, 3, pieces['Q'], 'white');
+    drawPiece(7, 4, pieces['K'], 'white');
+    drawPiece(7, 5, pieces['B'], 'white');
+    drawPiece(7, 6, pieces['N'], 'white');
+    drawPiece(7, 7, pieces['R'], 'white');
+    
+    // === DRAW UI LAST TO COVER THE BOTTOM SECTION ===
+    drawUI('White', "Make your move!");
+}
+
+let selectedSquare = null; // Tracks the (row, col) of the currently selected piece
+
+/**
+ * Clears the canvas and redraws everything, useful for animations/state changes.
+ */
+function redraw() {
+    // Clear everything from the previous frame
+    ctx.clearRect(0, 0, W, H); 
+    
+    // Redraw all static elements (Board + Pieces)
+    // (For simplicity in Cycle 2, we redraw the whole board, but in a real game, we would only redraw changed parts)
+    drawBoard();
+    
+    // Optionally draw selection highlights here based on selectedSquare
+}
+
+
+// Event Listeners for touch/mouse
+canvas.addEventListener('click', handleInteraction);
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const clientX = e.touches[0].clientX;
+    const clientY = e.touches[0].clientY;
+    // Calculate coordinates relative to the canvas origin
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    handleInteraction({ clientX: x, clientY: y });
+});
+
+function handleInteraction(event) {
+    // Calculate the grid coordinates (0-7) from pixel coordinates (x, y)
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+    
+    // Only process clicks within the board area (Top 400px)
+    if (clickY > BOARD_HEIGHT) {
+        console.log("Clicked in UI area.");
+        return;
+    }
+    
+    // Determine grid column and row
+    const col = Math.floor(clickX / SQUARE_SIZE);
+    const row = Math.floor(clickY / SQUARE_SIZE);
+    
+    console.log(`Clicked square at: Row=${row}, Col=${col}`);
+
+    // Basic logic: if we identify a piece/square, we highlight it and update UI.
+    
+    // 1. Clear previous selection
+    selectedSquare = null;
+    redraw(); 
+    
+    // 2. Placeholder logic: If we clicked anywhere on the board, assume selection logic runs.
+    if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+        // In a real game, we check if an *attacking* piece belongs at (row, col)
+        // For now, we just visually show we are "selecting" this general area.
+        if (!selectedSquare) {
+            selectedSquare = { row: row, col: col };
+            console.log(`Visual Selection placed at: ${selectedSquare.row}, ${selectedSquare.col}`);
+            
+            // Visual feedback for selection (draw a target circle/overlay on top of the board drawing)
+            // This requires temporarily drawing over the board or drawing the highlight logic in a separate 'drawHighlights'
+            
+            // For simplicity in this cycle, let's just redraw to confirm the logic hooked up.
+            redraw(); 
+        }
+    }
+}
+
+// Initial draw call
+drawBoard();
