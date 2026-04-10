@@ -47,11 +47,11 @@ Every game MUST follow this exact structure:
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #000; max-width: 100vw; max-height: 100vh; }
+        canvas { background: #000; max-width: 100vw; max-height: 100vh; width: auto; height: auto; display: block; }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas" width="400" height="700"></canvas>
     <!-- Load scripts in dependency order -->
     <script src="board.js"></script>
     <script src="game.js"></script>
@@ -71,7 +71,7 @@ const H = canvas.height;
 
 ## Game Design Rules
 
-- **STANDARD CANVAS SIZE: 800x600.** ALL games use this. No exceptions. Set `canvas.width = 800; canvas.height = 600;` in game.js.
+- **STANDARD CANVAS SIZE: 400x700 (portrait/mobile-first).** ALL games use this. Set `canvas.width = 400; canvas.height = 700;` in game.js. This fits phone screens vertically.
 - **Grid-based games** (Snake, Tetris, Minesweeper): use CELL_SIZE = 20 within the 800x600 canvas.
 - **Continuous games** (Pong, Breakout): use pixel coordinates directly.
 - **Game loop**: use `setInterval(gameLoop, 1000/10)` for grid-based games (10 FPS tick rate) or `requestAnimationFrame` for smooth animation games.
