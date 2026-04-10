@@ -2,6 +2,12 @@ import { resolve } from 'path';
 
 export type ModelPreset = 'dual' | 'single' | 'e4b' | 'e2b';
 
+export interface ReviewerProvider {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+}
+
 export interface GameForgeConfig {
   ollama: {
     host: string;
@@ -13,6 +19,7 @@ export interface GameForgeConfig {
       scout: string;
     };
   };
+  reviewer?: ReviewerProvider;  // Optional cloud reviewer (MiniMax, etc.)
   dashboard: {
     port: number;
   };
@@ -76,5 +83,13 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
     formspreeId: process.env['FORMSPREE_ID'] ?? '',
     gamesDir: resolve(process.cwd(), 'games'),
     preset,
+    // Cloud reviewer (MiniMax) — if MINIMAX_API_KEY is set, use it for reviews
+    ...(process.env['MINIMAX_API_KEY'] ? {
+      reviewer: {
+        baseUrl: process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io/v1',
+        model: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
+        apiKey: process.env['MINIMAX_API_KEY'],
+      },
+    } : {}),
   };
 }

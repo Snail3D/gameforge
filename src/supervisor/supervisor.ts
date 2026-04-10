@@ -434,10 +434,16 @@ export class Supervisor extends EventEmitter {
       }
 
       // Reviewer
-      const reviewerClient = new LLMClient({
-        baseUrl: this.config.ollama.host,
-        model: reviewerModel,
-      });
+      const reviewerClient = this.config.reviewer
+        ? new LLMClient({
+            baseUrl: this.config.reviewer.baseUrl,
+            model: this.config.reviewer.model,
+            apiKey: this.config.reviewer.apiKey,
+          })
+        : new LLMClient({
+            baseUrl: this.config.ollama.host,
+            model: reviewerModel,
+          });
 
       // Build reviewer context with actual file contents
       let reviewContext = `Review for step "${step.title}":\n\n`;
@@ -734,10 +740,16 @@ export class Supervisor extends EventEmitter {
       } catch { /* screenshot failed, review code only */ }
 
       // Reviewer — sees code AND screenshot
-      const reviewerClient = new LLMClient({
-        baseUrl: this.config.ollama.host,
-        model: reviewerModel,
-      });
+      const reviewerClient = this.config.reviewer
+        ? new LLMClient({
+            baseUrl: this.config.reviewer.baseUrl,
+            model: this.config.reviewer.model,
+            apiKey: this.config.reviewer.apiKey,
+          })
+        : new LLMClient({
+            baseUrl: this.config.ollama.host,
+            model: reviewerModel,
+          });
 
       let reviewContext = `Review for step "${step.title}":\n\n`;
       for (const [path, code] of Object.entries(result.files)) {

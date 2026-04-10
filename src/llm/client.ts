@@ -1,6 +1,7 @@
 export interface LLMClientConfig {
   baseUrl: string;
   model: string;
+  apiKey?: string;  // For cloud providers (MiniMax, OpenAI, etc.)
 }
 
 export interface ImageAttachment {
@@ -28,10 +29,12 @@ export interface StreamCallbacks {
 export class LLMClient {
   readonly model: string;
   private baseUrl: string;
+  private apiKey: string | undefined;
 
   constructor(config: LLMClientConfig) {
     this.baseUrl = config.baseUrl;
     this.model = config.model;
+    this.apiKey = config.apiKey;
   }
 
   buildMessages(
@@ -68,7 +71,10 @@ export class LLMClient {
 
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model: this.model,
         messages,
