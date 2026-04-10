@@ -109,24 +109,43 @@ export class RalphLoop extends EventEmitter {
       }
     } catch {}
 
-    // Screenshot
-    let images: Array<{ base64: string; mimeType: string }> = [];
+    // Screenshot — use E4B (multimodal) to describe what it sees
+    let visionDescription = '';
     try {
       const ss = await captureGameScreenshot(this.gameDir, this.metaDir, this.cycle);
       if (ss.base64) {
-        images = [{ base64: ss.base64, mimeType: 'image/png' }];
-        this.emitEvent({ type: 'screenshot', ts: new Date().toISOString(), agent: 'builder', model, path: ss.path, base64: ss.base64, description: 'Cycle ' + this.cycle });
+        this.emitEvent({ type: 'screenshot', ts: new Date().toISOString(), agent: 'scout', model: 'gemma4:e4b', path: ss.path, base64: ss.base64, description: 'Cycle ' + this.cycle });
+
+        // Ask E4B to describe what it sees
+        if (this.cycle > 0) {
+          try {
+            const visionClient = new LLMClient({
+              baseUrl: this.config.ollama.host,
+              model: 'gemma4:e4b',
+            });
+            const visionResponse = await visionClient.chat(
+              visionClient.buildMessages(
+                'Describe what you see in this game screenshot in 2-3 sentences. Focus on: what is rendered, what works, what looks broken or missing.',
+                'Describe this game screenshot:',
+                undefined,
+                [{ base64: ss.base64, mimeType: 'image/png' }]
+              )
+            );
+            visionDescription = '\n\nVISION REPORT (E4B sees the game): ' + visionResponse.content;
+            this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'scout', model: 'gemma4:e4b', content: 'Vision: ' + visionResponse.content.substring(0, 300), tokensIn: visionResponse.tokensIn, tokensOut: visionResponse.tokensOut, tokPerSec: visionResponse.tokensOut / (visionResponse.durationMs / 1000) });
+          } catch {}
+        }
       }
     } catch {}
 
     const prompt = this.cycle === 0
       ? 'Build this game from scratch: "' + this.userPrompt + '"\n\nMake something visible immediately. Current files:\n' + gameFiles
-      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Look at the screenshot. Add the next feature or fix the biggest issue.\n\nCurrent files:\n' + gameFiles;
+      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Add the next feature or fix the biggest issue.' + visionDescription + '\n\nCurrent files:\n' + gameFiles;
 
     this.emitEvent({ type: 'step_assign', ts: new Date().toISOString(), agent: 'supervisor', model: 'none', stepId: String(this.cycle + 1), title: 'Cycle ' + (this.cycle + 1) });
 
     const response = await this.client.chat(
-      this.client.buildMessages(SYSTEM_PROMPT, prompt, undefined, images),
+      this.client.buildMessages(SYSTEM_PROMPT, prompt),
       { onToken: (token) => this.emit('token', { agent: 'builder', token }) }
     );
 
