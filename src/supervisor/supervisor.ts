@@ -707,7 +707,33 @@ export class Supervisor extends EventEmitter {
         });
       }
 
-      // Reviewer
+      // Take screenshot for Reviewer (E4B has vision)
+      let screenshotImages: Array<{ base64: string; mimeType: string }> = [];
+      try {
+        const screenshot = await captureGameScreenshot(this.gameDir, this.metaDir, step.stepId);
+        if (screenshot.base64) {
+          screenshotImages = [{ base64: screenshot.base64, mimeType: 'image/png' }];
+          this.emitEvent({
+            type: 'screenshot',
+            ts: new Date().toISOString(),
+            agent: 'reviewer',
+            model: reviewerModel,
+            path: screenshot.path,
+            base64: screenshot.base64,
+            description: `Step ${step.stepId}: ${step.title}`,
+          });
+        }
+        this.emitEvent({
+          type: 'game_reload',
+          ts: new Date().toISOString(),
+          agent: 'supervisor',
+          model: 'none',
+          success: screenshot.loaded,
+          consoleErrors: screenshot.errors || [],
+        });
+      } catch { /* screenshot failed, review code only */ }
+
+      // Reviewer — sees code AND screenshot
       const reviewerClient = new LLMClient({
         baseUrl: this.config.ollama.host,
         model: reviewerModel,
@@ -717,11 +743,16 @@ export class Supervisor extends EventEmitter {
       for (const [path, code] of Object.entries(result.files)) {
         reviewContext += `## ${path}\n\`\`\`\n${code}\n\`\`\`\n\n`;
       }
-      reviewContext += `Acceptance criteria:\n${step.acceptanceCriteria.map(c => `- ${c}`).join('\n')}`;
+      reviewContext += `Acceptance criteria:\n${(step.acceptanceCriteria || []).map(c => `- ${c}`).join('\n')}`;
+      if (screenshotImages.length > 0) {
+        reviewContext += '\n\nA screenshot of the current game state is attached. Check if the game renders correctly.';
+      }
 
       const reviewerMessages = reviewerClient.buildMessages(
         readFileSync(join(resolve(process.cwd(), 'src/prompts'), 'reviewer.md'), 'utf-8'),
         reviewContext,
+        undefined,
+        screenshotImages,
       );
       const reviewerResponse = await reviewerClient.chat(reviewerMessages);
 

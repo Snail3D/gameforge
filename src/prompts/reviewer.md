@@ -35,6 +35,17 @@ Quick quality gate — not deep analysis. You read the changed files and look fo
 
 You MUST output exactly one of these three formats:
 
+## Visual Check (if screenshot attached)
+
+If a screenshot is attached, also check:
+- Does the game render? (not just a blank/black screen)
+- Are the expected visual elements present? (board, pieces, UI elements)
+- Any obvious visual glitches?
+
+If the code looks correct but the game doesn't render, check for: missing function calls, functions defined but never called, canvas not being drawn to. Include this in your FAIL reason.
+
+## Output Format
+
 **If no issues found:**
 ```
 PASS: [one sentence noting something done well]
