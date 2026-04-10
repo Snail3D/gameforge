@@ -30,7 +30,7 @@ struct AgentChatView: View {
             // Messages
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 6) {
                         ForEach(messages) { msg in
                             MessageBubbleView(message: msg)
                                 .id(msg.id)
