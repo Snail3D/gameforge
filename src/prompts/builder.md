@@ -51,7 +51,7 @@ Every game MUST follow this exact structure:
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="640" height="640"></canvas>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
     <!-- Load scripts in dependency order -->
     <script src="board.js"></script>
     <script src="game.js"></script>
@@ -71,7 +71,8 @@ const H = canvas.height;
 
 ## Game Design Rules
 
-- **Grid-based games** (Snake, Tetris, Minesweeper): use CELL_SIZE = 20. Canvas = CELL_SIZE * grid count.
+- **STANDARD CANVAS SIZE: 800x600.** ALL games use this. No exceptions. Set `canvas.width = 800; canvas.height = 600;` in game.js.
+- **Grid-based games** (Snake, Tetris, Minesweeper): use CELL_SIZE = 20 within the 800x600 canvas.
 - **Continuous games** (Pong, Breakout): use pixel coordinates directly.
 - **Game loop**: use `setInterval(gameLoop, 1000/10)` for grid-based games (10 FPS tick rate) or `requestAnimationFrame` for smooth animation games.
 - **Clear canvas every frame**: `ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);`
