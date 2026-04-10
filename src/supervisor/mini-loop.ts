@@ -35,8 +35,10 @@ export class MiniLoop {
   }
 
   parseCriticVerdict(response: string): CriticVerdict {
-    const verdictMatch = /VERDICT:\s*(PASS|FAIL)/i.exec(response);
-    const reasonMatch = /REASON:\s*(.+)/i.exec(response);
+    // Strip <think>...</think> blocks
+    const cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const verdictMatch = /VERDICT:\s*(PASS|FAIL)/i.exec(cleaned);
+    const reasonMatch = /REASON:\s*(.+)/i.exec(cleaned);
     const featureMatch = /FEATURE_UPDATES:\s*(.+)/i.exec(response);
 
     const passed = verdictMatch ? verdictMatch[1].toUpperCase() === 'PASS' : false;
@@ -51,10 +53,20 @@ export class MiniLoop {
   }
 
   parseReviewerVerdict(response: string): { passed: boolean; hasFixedCode: boolean } {
-    const trimmed = response.trimStart().toLowerCase();
-    if (trimmed.startsWith('pass_with_fixes') || trimmed.startsWith('pass with fixes')) {
+    // Strip <think>...</think> blocks (MiniMax reasoning tokens)
+    const stripped = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trimStart();
+    const lower = stripped.toLowerCase();
+    if (lower.startsWith('pass_with_fixes') || lower.startsWith('pass with fixes')) {
       return { passed: true, hasFixedCode: true };
     }
-    return { passed: trimmed.startsWith('pass'), hasFixedCode: false };
+    // Also check for **PASS** markdown bold and PASS: patterns
+    if (lower.startsWith('pass') || lower.startsWith('**pass')) {
+      return { passed: lower.includes('with_fixes') || lower.includes('with fixes'), hasFixedCode: lower.includes('with_fixes') || lower.includes('with fixes') };
+    }
+    // Search deeper — MiniMax might put PASS after reasoning
+    if (/\bpass\b/i.test(stripped.substring(0, 200)) && !/\bfail\b/i.test(stripped.substring(0, 200))) {
+      return { passed: true, hasFixedCode: false };
+    }
+    return { passed: false, hasFixedCode: false };
   }
 }

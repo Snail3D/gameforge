@@ -85,8 +85,8 @@ export class FormedBuilder extends EventEmitter {
         { onToken: (token) => this.emit('token', { agent: 'builder', token }) }
       );
 
-      // Strip markdown fences if model included them
-      let code = response.content.trim();
+      // Strip <think> blocks and markdown fences
+      let code = response.content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
       const fenceMatch = code.match(/```(?:javascript|js|html|css)?\n?([\s\S]*?)```/);
       if (fenceMatch) code = fenceMatch[1].trim();
 
