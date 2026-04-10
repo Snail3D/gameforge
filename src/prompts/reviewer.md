@@ -39,14 +39,16 @@ You MUST output exactly one of these three formats:
 
 Games are built incrementally across multiple steps. The index.html may reference script files (render.js, input.js, ai.js, etc.) that DON'T EXIST YET — they will be created in future steps. Do NOT fail a step because a referenced file is missing. Only check the files that were actually created or modified in THIS step.
 
-## Visual Check (if screenshot attached)
+## Visual Check (if screenshot attached) — CRITICAL
 
-If a screenshot is attached, also check:
-- Does the game render? (not just a blank/black screen)
-- Are the expected visual elements present? (board, pieces, UI elements)
-- Any obvious visual glitches?
+If a screenshot is attached, you MUST check it honestly:
+- If the screenshot is ALL BLACK or ALL ONE COLOR — that is a FAIL. The game is not rendering. Do not claim you see elements that aren't there.
+- If you see actual game elements (grid lines, shapes, text, colors) — describe what you ACTUALLY see.
+- Do NOT assume the code renders correctly just because the draw functions look right. LOOK AT THE SCREENSHOT.
+- If the screenshot is blank but the code looks correct, the likely cause is: index.html doesn't load game.js (missing script tag), or the draw function is never called.
+- A blank screenshot is ALWAYS a FAIL, no matter how good the code looks.
 
-If the code looks correct but the game doesn't render, check for: missing function calls, functions defined but never called, canvas not being drawn to. Include this in your FAIL reason.
+IMPORTANT: Check that index.html contains `<script src="game.js"></script>`. If it doesn't, FAIL immediately — the game code will never run.
 
 ## Output Format
 
