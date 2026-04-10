@@ -91,6 +91,10 @@ final class AppState {
         wsClient = WebSocketClient()
         wsClient?.onEvent = { [weak self] event in
             DispatchQueue.main.async {
+                // Keep isRunning true as long as we're getting events
+                if !(self?.isRunning ?? false) {
+                    self?.isRunning = true
+                }
                 self?.handleEvent(event)
             }
         }
