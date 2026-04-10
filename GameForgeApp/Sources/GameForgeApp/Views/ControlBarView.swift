@@ -59,9 +59,11 @@ struct ControlBarView: View {
                 Text("Single (32GB)").tag("single")
                 Text("E4B (16GB)").tag("e4b")
                 Text("E2B (8GB)").tag("e2b")
+                Text("OSS 120B (65GB)").tag("oss120b")
+                Text("Qwopus 27B (MLX)").tag("qwopus")
                 Text("MiniMax (Cloud)").tag("minimax")
             }
-            .frame(width: 140)
+            .frame(width: 160)
 
             Spacer()
 

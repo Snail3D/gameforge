@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 
-export type ModelPreset = 'dual' | 'single' | 'e4b' | 'e2b' | 'minimax';
+export type ModelPreset = 'dual' | 'single' | 'e4b' | 'e2b' | 'minimax' | 'qwopus' | 'oss120b' | 'carnice';
 
 export interface ReviewerProvider {
   baseUrl: string;
@@ -68,6 +68,30 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
       critic: 'gemma4:e2b',
       scout: 'gemma4:e2b',
     },
+    // Qwopus — Qwen 27B Opus-distilled on MLX (port 8080)
+    qwopus: {
+      planner: 'nightmedia/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-qx64-hi-mlx',
+      builder: 'nightmedia/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-qx64-hi-mlx',
+      reviewer: 'nightmedia/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-qx64-hi-mlx',
+      critic: 'nightmedia/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-qx64-hi-mlx',
+      scout: 'nightmedia/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-qx64-hi-mlx',
+    },
+    // GPT-oss 120B — heavy hitter, best code quality
+    oss120b: {
+      planner: 'gpt-oss:120b',
+      builder: 'gpt-oss:120b',
+      reviewer: 'gpt-oss:120b',
+      critic: 'gpt-oss:120b',
+      scout: 'gpt-oss:120b',
+    },
+    // Carnice 27B — local 27B model
+    carnice: {
+      planner: 'carnice:27b-q4',
+      builder: 'carnice:27b-q4',
+      reviewer: 'carnice:27b-q4',
+      critic: 'carnice:27b-q4',
+      scout: 'carnice:27b-q4',
+    },
     // MiniMax cloud — everything runs on MiniMax M2.7, zero local GPU
     minimax: {
       planner: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
@@ -79,9 +103,11 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
   };
 
   // For minimax preset, override host to MiniMax API
-  const host = preset === 'minimax'
-    ? (process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io')
-    : (process.env['OLLAMA_HOST'] ?? 'http://localhost:11434');
+  const hostMap: Partial<Record<ModelPreset, string>> = {
+    minimax: process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io',
+    qwopus: 'http://localhost:8080',
+  };
+  const host = hostMap[preset] ?? (process.env['OLLAMA_HOST'] ?? 'http://localhost:11434');
 
   return {
     ollama: {
