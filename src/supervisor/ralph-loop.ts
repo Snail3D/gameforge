@@ -17,7 +17,7 @@ import { execFileSync, } from 'node:child_process';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
-const SYSTEM_PROMPT = 'You are GameForge, an autonomous game developer. You build HTML5 canvas games from scratch, iteratively improving them each cycle.\n\nEach cycle you receive the current game files and a screenshot. You respond with:\n1. Brief assessment (1-2 sentences)\n2. What you will do this cycle (1 sentence)\n3. COMPLETE updated files in code blocks with paths like ```js:game.js\n\nRules:\n- Canvas is ALWAYS 400x700 (portrait, mobile-first)\n- index.html MUST have <script src="game.js"></script>\n- Vanilla JS only. No frameworks.\n- Every cycle must produce a visible improvement\n- Write COMPLETE files, not snippets\n- Make the game FUN — good colors, smooth animations, satisfying feedback\n- Touch controls alongside keyboard/mouse\n- Focus on ONE thing per cycle: add a feature, fix a bug, or polish';
+const SYSTEM_PROMPT = 'You are GameForge, an autonomous game developer. You build HTML5 canvas games iteratively.\n\nEach cycle you receive: game files, a vision report from Scout (who SEES the game), and optionally an answer to a question you asked last cycle.\n\nRespond with:\n1. Brief assessment (1-2 sentences)\n2. What you will do (1 sentence)\n3. COMPLETE updated files in ```js:game.js blocks\n4. OPTIONAL: Ask Scout to check something visually next cycle:\nSCOUT_QUESTION: [your question]\n\nExamples:\nSCOUT_QUESTION: Are all 8 pawns visible on each side? Count them.\nSCOUT_QUESTION: Is the turn indicator overlapping any pieces?\nSCOUT_QUESTION: Does the selected piece highlight show up? What color?\n\nRules:\n- Canvas 400x700 (portrait, mobile-first)\n- index.html MUST have <script src="game.js"></script>\n- Vanilla JS only\n- Every cycle = visible improvement\n- COMPLETE files, not snippets\n- Make it FUN\n- Touch + keyboard controls\n- ONE thing per cycle';
 
 export interface RalphLoopOptions {
   config: GameForgeConfig;
@@ -37,6 +37,7 @@ export class RalphLoop extends EventEmitter {
   private metaDir = '';
   private startTime = 0;
   private cycle = 0;
+  private lastScoutAnswer = '';  // Carries over Builder's Scout Q&A to next cycle
 
   constructor(options: RalphLoopOptions) {
     super();
@@ -155,7 +156,7 @@ export class RalphLoop extends EventEmitter {
 
     const prompt = this.cycle === 0
       ? 'Build this game from scratch: "' + this.userPrompt + '"\n\nMake something visible immediately. Current files:\n' + gameFiles
-      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Add the next feature or fix the biggest issue.' + visionDescription + fileSizeWarning + '\n\nCurrent files:\n' + gameFiles;
+      : 'Cycle ' + this.cycle + ' of "' + this.userPrompt + '". Add the next feature or fix the biggest issue.' + visionDescription + this.lastScoutAnswer + fileSizeWarning + '\n\nCurrent files:\n' + gameFiles;
 
     this.emitEvent({ type: 'step_assign', ts: new Date().toISOString(), agent: 'supervisor', model: 'none', stepId: String(this.cycle + 1), title: 'Cycle ' + (this.cycle + 1) });
 
@@ -170,6 +171,33 @@ export class RalphLoop extends EventEmitter {
     if (saved.length > 0) {
       this.emitEvent({ type: 'tool_call', ts: new Date().toISOString(), agent: 'builder', model, tool: 'write_file', args: { files: saved }, result: 'Saved: ' + saved.join(', ') });
       this.emitEvent({ type: 'step_update', ts: new Date().toISOString(), agent: 'supervisor', model, stepId: String(this.cycle + 1), status: 'passed', attempt: 1 });
+    }
+
+    // Check if Builder asked Scout a question
+    const scoutMatch = /SCOUT_QUESTION:\s*(.+)/i.exec(response.content);
+    if (scoutMatch) {
+      const question = scoutMatch[1].trim();
+      this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'builder', model, content: 'Asking Scout: ' + question, tokensIn: 0, tokensOut: 0, tokPerSec: 0 });
+
+      try {
+        // Take fresh screenshot after files were saved
+        const freshSs = await captureGameScreenshot(this.gameDir, this.metaDir, this.cycle);
+        if (freshSs.base64) {
+          const visionClient = new LLMClient({ baseUrl: this.config.ollama.host, model: 'gemma4:e4b' });
+          const answer = await visionClient.chat(
+            visionClient.buildMessages(
+              'You are a visual QA tester looking at a game screenshot. Answer the developer\'s question honestly and specifically. If something is wrong, say exactly what and where.',
+              question,
+              undefined,
+              [{ base64: freshSs.base64, mimeType: 'image/png' }]
+            )
+          );
+          this.lastScoutAnswer = '\n\nSCOUT ANSWER (from last cycle): Q: ' + question + '\nA: ' + answer.content;
+          this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'scout', model: 'gemma4:e4b', content: 'Answer: ' + answer.content.substring(0, 300), tokensIn: answer.tokensIn, tokensOut: answer.tokensOut, tokPerSec: answer.tokensOut / (answer.durationMs / 1000) });
+        }
+      } catch { this.lastScoutAnswer = ''; }
+    } else {
+      this.lastScoutAnswer = '';
     }
   }
 
