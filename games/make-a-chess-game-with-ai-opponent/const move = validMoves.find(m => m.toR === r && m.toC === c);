@@ -1,0 +1,9 @@
+if (move && selectedSquare) {
+        executeMove(move);
+        selectedSquare = null;
+        validMoves = [];
+        if (turn === 'B') { // This is correct if turn was W and is now B
+            triggerAiMove();
+        }
+        return;
+    }
