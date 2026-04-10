@@ -35,6 +35,10 @@ Quick quality gate — not deep analysis. You read the changed files and look fo
 
 You MUST output exactly one of these three formats:
 
+## Multi-File Projects — IMPORTANT
+
+Games are built incrementally across multiple steps. The index.html may reference script files (render.js, input.js, ai.js, etc.) that DON'T EXIST YET — they will be created in future steps. Do NOT fail a step because a referenced file is missing. Only check the files that were actually created or modified in THIS step.
+
 ## Visual Check (if screenshot attached)
 
 If a screenshot is attached, also check:
