@@ -1,0 +1,256 @@
+const canvas = document.createElement('canvas');
+canvas.id = 'chessCanvas';
+document.body.appendChild(canvas);
+const canvasContext = canvas.getContext('2d');
+
+const BOARD_SIZE = 800;
+const SQUARE_DIMENSION = BOARD_SIZE / 8; // 100 pixels
+
+// Game State Variables (Simplified for this context)
+let gameState = {
+    board: [], // 8x8 array of piece codes or null
+    currentPlayer: 'w', // 'w' for white, 'b' for black
+    selectedSource: null, // {row: r, col: c}
+    possibleMoves: []     // [{row: r, col: c}, ...]
+};
+
+// Piece Definitions (R, N, B, Q, K, P)
+const PIECES = {
+    'R': { symbol: 'R', white: null, black: 'r' },
+    'N': { symbol: 'N', white: null, black: 'n' },
+    'B': { symbol: 'B', white: null, black: 'b' },
+    'Q': { symbol: 'Q', white: null, black: 'q' },
+    'K': { symbol: 'K', white: null, black: 'k' },
+    'P': { symbol: 'P', white: null, black: 'p' }
+};
+
+// --- State Persistence Functions ---
+
+/**
+ * Initializes the game board state with starting positions.
+ */
+function setupInitialBoard() {
+    // Initialize empty board
+    gameState.board = Array(8).fill(0).map(() => Array(8).fill(null));
+
+    // Setup pieces (White on rows 0, 1; Black on rows 6, 7)
+    // Row 0: Black back rank
+    gameState.board[0][0] = 'R'; gameState.board[0][1] = 'N'; gameState.board[0][2] = 'B'; 
+    gameState.board[0][3] = 'Q'; gameState.board[0][4] = 'K'; gameState.board[0][5] = 'B'; 
+    gameState.board[0][6] = 'N'; gameState.board[0][7] = 'R';
+    // Row 1: Black pawns
+    for (let i = 0; i < 8; i++) {
+        gameState.board[1][i] = 'P';
+    }
+
+    // Row 2-5: Empty
+    
+    // Row 6: White pawns
+    for (let i = 0; i < 8; i++) {
+        gameState.board[6][i] = 'P';
+    }
+    // Row 7: White back rank
+    gameState.board[7][0] = 'R'; gameState.board[7][1] = 'N'; gameState.board[7][2] = 'B'; 
+    gameState.board[7][3] = 'Q'; gameState.board[7][4] = 'K'; gameState.board[7][5] = 'B'; 
+    gameState.board[7][6] = 'N'; gameState.board[7][7] = 'R';
+
+    // NOTE: In this implementation, since we are using symbols (R, P) and getPieceColor() relates them, 
+    // we need a way to distinguish ownership visually if the PieceCode itself isn't colored.
+    // For rendering simplicity based on the provided structure, we rely on getPieceColor.
+    // We assume default setup places Black pieces at lower indices (row 0, 1) and White at higher indices (row 7, 6) 
+    // based on typical chess board matrix indexing if we treat index 0 as top.
+    // Let's adjust the board setup to match standard convention where row 0 is the top row (Black side).
+
+    gameState.board[0][0] = 'R'; gameState.board[0][1] = 'N'; gameState.board[0][2] = 'B'; 
+    gameState.board[0][3] = 'Q'; gameState.board[0][4] = 'K'; gameState.board[0][5] = 'B'; 
+    gameState.board[0][6] = 'N'; gameState.board[0][7] = 'R'; // Black pieces (Top side)
+    
+    for (let i = 0; i < 8; i++) {
+        gameState.board[1][i] = 'P';
+    }
+    
+    // Middle empty rows (Rows 2-5)
+    
+    for (let i = 0; i < 8; i++) {
+        gameState.board[6][i] = 'P';
+    }
+    // Row 7: White back rank (Bottom side)
+    gameState.board[7][0] = 'R'; gameState.board[7][1] = 'N'; gameState.board[7][2] = 'B'; 
+    gameState.board[7][3] = 'Q'; gameState.board[7][4] = 'K'; gameState.board[7][5] = 'B'; 
+    gameState.board[7][6] = 'N'; gameState.board[7][7] = 'R';
+}
+
+/**
+ * Determines the color based on piece ownership. 
+ * If the piece code implies a specific case (e.g., 'p' lowercase or 'P' uppercase), 
+ * this function must handle it. Here, we assume the provided symbol dictates the color grouping.
+ * @param {string} pieceSymbol - The piece type ('R', 'P', etc.).
+ * @param {number} row - The row index (0-7).
+ * @param {number} col - The column index (0-7).
+ * @returns {'white' | 'black' | null} The color ownership.
+ */
+function getPieceColor(pieceSymbol, row, col) {
+    if (!pieceSymbol) return null;
+
+    // If the symbol is uppercase, assume White (White starts at the 'bottom' in array index 7)
+    // If the symbol is lowercase, assume Black (Black starts at the 'top' in array index 0)
+    // Since setupInitialBoard puts Black at rows 0, 1 and White at rows 6, 7, we infer color by proximity to edges or case.
+    
+    if (typeof pieceSymbol === 'string' && pieceSymbol.length === 1) {
+        const char = pieceSymbol.toUpperCase();
+        
+        // A simple heuristic based on standard FEN representation mapping:
+        // If the piece is found starting near row 0 (0, 1), it's Black.
+        if (row < 2) return 'black'; 
+        // If the piece is found starting near row 7 (6, 7), it's White.
+        if (row >= 6) return 'white';
+        
+        // Fallback based on assumed standard symbol convention:
+        if (char === 'P' && row > 3) return 'white'; // Pawns on rows 6/7 are white
+        if ((char === 'r' || char === 'N' || char === 'B' || char === 'Q' || char === 'K') && row < 2) return 'black'; // Pieces on rows 0/1 are black
+        return 'unknown';
+    }
+
+    // If we only rely on the symbol defined in setup:
+    if (['R', 'N', 'B', 'Q', 'K', 'P'].includes(pieceSymbol)) {
+        // This path is tricky without explicit piece origin tracking. 
+        // We rely on the fact that setupInitialBoard placed Black at 0,1 and White at 6,7
+        if ((row < 2 && (col % 2 === 0 ? 0 : 1) > 0) || (row > 4 && (col % 2 === 0 ? 0 : 1) > 0)) {
+             // Simplification: Assume if the piece symbol is set, we check global context.
+             // Since we cannot reliably distinguish ownership just by 'R', we pass the color based on the cell's expected occupant.
+             
+             // For the scope of this task, we will assume any piece found on the top half (row < 4) is black, and bottom half (row > 3) is white.
+             return (row < 4) ? 'black' : 'white';
+        }
+    }
+    
+    // If the symbol is lowercase, treat it as black (e.g., 'p' for black pawn)
+    if (pieceSymbol === pieceSymbol.toLowerCase() && pieceSymbol.length === 1) {
+        return 'black';
+    } 
+    // Otherwise, treat it as white (e.g., 'P' for white pawn)
+    return 'white';
+}
+
+
+/**
+ * Draws a single piece symbol onto the canvas at the specified coordinates.
+ * @param {string} pieceSymbol - The piece type ('R', 'P', etc.).
+ * @param {number} row - The row index (0-7).
+ * @param {number} col - The column index (0-7).
+ * @param {string} color - 'white' or 'black' to determine the drawn color.
+ */
+function drawPiece(pieceSymbol, row, col, color) {
+    const centerX = col * SQUARE_DIMENSION + SQUARE_DIMENSION / 2;
+    const centerY = row * SQUARE_DIMENSION + SQUARE_DIMENSION / 2;
+    const drawSize = SQUARE_DIMENSION * 0.8;
+
+    canvasContext.fillStyle = (color === 'white') ? '#FFFFFF' : '#000000';
+    canvasContext.strokeStyle = '#333333';
+    canvasContext.lineWidth = 2;
+
+    canvasContext.beginPath();
+    canvasContext.arc(centerX, centerY, drawSize / 2, 0, Math.PI * 2);
+    canvasContext.fill();
+    canvasContext.stroke();
+
+    canvasContext.fillStyle = (color === 'white') ? '#000000' : '#FFFFFF';
+    canvasContext.font = `${drawSize * 0.5}px Arial`;
+    canvasContext.textAlign = 'center';
+    canvasContext.textBaseline = 'middle';
+    canvasContext.fillText(pieceSymbol, centerX, centerY);
+}
+
+/**
+ * Draws the checkered pattern for the 64 squares, including highlights.
+ */
+function drawBoard() {
+    // 1. Clear the canvas
+    canvasContext.clearRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+
+    // 2. Draw background/squares (The requested implementation uses fillRect directly)
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const x_start = col * SQUARE_DIMENSION;
+            const y_start = row * SQUARE_DIMENSION;
+            
+            let highlightColor = null;
+            let isHighlighted = false;
+            
+            // Check for highlights
+            if (gameState.selectedSource && gameState.selectedSource.row === row && gameState.selectedSource.col === col) {
+                highlightColor = 'rgba(255, 255, 0, 0.5)'; // Selected
+                isHighlighted = true;
+            } else if (gameState.possibleMoves.some(move => move.row === row && move.col === col)) {
+                highlightColor = 'rgba(0, 200, 0, 0.3)'; // Possible move destination
+                isHighlighted = true;
+            } 
+            
+            // Draw the square
+            canvasContext.save();
+            if (isHighlighted && highlightColor) {
+                canvasContext.fillStyle = highlightColor;
+                canvasContext.fillRect(x_start, y_start, SQUARE_DIMENSION, SQUARE_DIMENSION);
+            } else {
+                // Standard square color alternation: Check (row + col) parity.
+                // Using the requested fixed definition:
+                const color = ((row + col) % 2 === 0) ? '#Eeeecc' : '#769d7e';
+                canvasContext.fillStyle = color;
+                canvasContext.fillRect(x_start, y_start, SQUARE_DIMENSION, SQUARE_DIMENSION);
+            }
+            canvasContext.restore();
+        }
+    }
+
+    // 3. Draw Pieces
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const pieceCode = gameState.board[row][col];
+            if (pieceCode) {
+                let pieceColor = getPieceColor(pieceCode, row, col); 
+                if (pieceColor) {
+                    drawPiece(pieceCode, row, col, pieceColor);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Primary function to render the entire game state onto the canvas.
+ */
+function renderGame() {
+    drawBoard();
+}
+
+/**
+ * Sets up the board drawing element and initializes the game state.
+ */
+function initializeGame() {
+    // Set canvas size attributes
+    canvas.width = BOARD_SIZE;
+    canvas.height = BOARD_SIZE;
+    
+    setupInitialBoard();
+    renderGame();
+}
+
+// Event Listeners (Placeholder functionality)
+canvas.addEventListener('click', (event) => {
+    // Basic coordinate calculation based on click position
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Calculate board coordinates (row, col)
+    const col = Math.floor((x / SQUARE_DIMENSION));
+    const row = Math.floor((y / SQUARE_DIMENSION));
+
+    if (row >= 0 && row < 8 && col >= 0 && col < 8) {
+        console.log(`Clicked at (${row}, ${col})`);
+        // Placeholder: In a real game, this would handle selection/move attempt
+    }
+});
+
+// Start the game
+initializeGame();

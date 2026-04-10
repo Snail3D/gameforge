@@ -42,7 +42,8 @@ export async function testGame(
     loaded = false;
   }
 
-  await page.waitForTimeout(1000);
+  // Wait for game to render — canvas games need a few frames
+  await page.waitForTimeout(3000);
 
   const timestamp = Date.now();
   const screenshotPath = join(screenshotDir, `step${stepId}-${timestamp}.png`);

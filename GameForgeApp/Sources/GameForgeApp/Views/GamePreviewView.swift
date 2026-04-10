@@ -22,7 +22,12 @@ struct GamePreviewView: NSViewRepresentable {
             webView.loadHTMLString(loadingStateHTML, baseURL: nil)
             return
         }
-        webView.loadFileURL(indexURL, allowingReadAccessTo: dir)
+        // Force reload by clearing cache first, then loading
+        // WKWebView caches file:// URLs aggressively
+        let config = webView.configuration.websiteDataStore
+        config.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: .distantPast) {
+            webView.loadFileURL(indexURL, allowingReadAccessTo: dir)
+        }
     }
 
     private var emptyStateHTML: String {
