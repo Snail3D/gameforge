@@ -53,8 +53,9 @@ export class MiniLoop {
   }
 
   parseReviewerVerdict(response: string): { passed: boolean; hasFixedCode: boolean } {
-    // Strip <think>...</think> blocks (MiniMax reasoning tokens)
-    const stripped = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trimStart();
+    // Strip <think>...</think> blocks, markdown fences, and whitespace
+    let stripped = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    stripped = stripped.replace(/```\w*\n?/g, '').trim();
     const lower = stripped.toLowerCase();
     if (lower.startsWith('pass_with_fixes') || lower.startsWith('pass with fixes')) {
       return { passed: true, hasFixedCode: true };
