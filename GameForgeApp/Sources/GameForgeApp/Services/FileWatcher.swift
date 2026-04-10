@@ -19,7 +19,7 @@ final class FileWatcher {
         source?.setEventHandler { [weak self] in
             // Debounce — wait 300ms for all writes to settle
             self?.debounceWork?.cancel()
-            let work = DispatchWorkItem { self?.onChange?() }
+            let work = DispatchWorkItem { [weak self] in self?.onChange?() }
             self?.debounceWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
         }

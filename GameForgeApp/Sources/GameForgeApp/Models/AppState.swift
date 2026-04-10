@@ -104,7 +104,7 @@ final class AppState {
             if let buffer = streamingBuffers[m.agent], !buffer.isEmpty {
                 streamingBuffers[m.agent] = nil
             }
-            messages.append(AgentMessage(agent: m.agent, content: m.content, model: m.model, tokPerSec: m.tokPerSec ?? 0))
+            messages.append(AgentMessage(agent: m.agent, content: m.content, model: m.model ?? "", tokPerSec: m.tokPerSec ?? 0))
 
         case .tokenStream(let t):
             streamingBuffers[t.agent, default: ""] += t.token
@@ -134,28 +134,45 @@ final class AppState {
                 progress = Double(s.stepsCompleted) / Double(s.stepsTotal)
             }
 
-        case .gameReady:
-            // Find the actual game directory
-            let gamesDir = URL(fileURLWithPath: NSHomeDirectory())
-                .appendingPathComponent("gameforge/games")
-            if let firstGame = try? FileManager.default.contentsOfDirectory(at: gamesDir, includingPropertiesForKeys: nil)
-                .first(where: { $0.hasDirectoryPath && !$0.lastPathComponent.starts(with: ".") }) {
-                gameDir = firstGame
-                setupFileWatcher(dir: firstGame)
+        case .gameReady(let g):
+            let projectDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("gameforge")
+            if let urlPath = g.url {
+                // Backend sends relative path like "/game/index.html" — derive game dir from it
+                let trimmed = urlPath.hasPrefix("/") ? String(urlPath.dropFirst()) : urlPath
+                let fullURL = projectDir.appendingPathComponent(trimmed)
+                let dir = fullURL.deletingLastPathComponent()
+                if FileManager.default.fileExists(atPath: dir.path) {
+                    gameDir = dir
+                    setupFileWatcher(dir: dir)
+                    break
+                }
+            }
+            // Fallback: scan games directory for newest
+            let gamesDir = projectDir.appendingPathComponent("games")
+            if let dirs = try? FileManager.default.contentsOfDirectory(at: gamesDir, includingPropertiesForKeys: [.creationDateKey])
+                .filter({ $0.hasDirectoryPath && !$0.lastPathComponent.starts(with: ".") })
+                .sorted(by: {
+                    let d1 = try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate
+                    let d2 = try? $1.resourceValues(forKeys: [.creationDateKey]).creationDate
+                    return (d1 ?? .distantPast) > (d2 ?? .distantPast)
+                }),
+               let newest = dirs.first {
+                gameDir = newest
+                setupFileWatcher(dir: newest)
             }
 
         case .screenshot(let s):
-            messages.append(AgentMessage(agent: s.agent, content: "[Screenshot] \(s.description)", model: s.model, tokPerSec: 0, screenshotBase64: s.base64))
+            messages.append(AgentMessage(agent: s.agent, content: "[Screenshot] \(s.description)", model: s.model ?? "", tokPerSec: 0, screenshotBase64: s.base64))
 
         case .ghostIntervention(let g):
-            messages.append(AgentMessage(agent: "ghost", content: "[\(g.trigger)] \(g.response)", model: g.model, tokPerSec: 0))
+            messages.append(AgentMessage(agent: "ghost", content: "[\(g.trigger)] \(g.response)", model: g.model ?? "", tokPerSec: 0))
 
         case .loopDetected(let l):
             loopsCaught += 1
             messages.append(AgentMessage(agent: "supervisor", content: "Loop detected (attempt \(l.recoveryAttempt)): \(String(l.repeatedTokens.prefix(80)))", model: "", tokPerSec: 0))
 
         case .toolCall(let t):
-            messages.append(AgentMessage(agent: t.agent, content: "[\(t.tool)] \(t.result)", model: t.model, tokPerSec: 0, isToolCall: true))
+            messages.append(AgentMessage(agent: t.agent, content: "[\(t.tool)] \(t.result)", model: t.model ?? "", tokPerSec: 0, isToolCall: true))
             // Reload game if files were written
             if t.tool == "write_file" {
                 reloadCount += 1

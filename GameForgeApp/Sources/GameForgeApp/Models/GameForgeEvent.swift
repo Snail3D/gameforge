@@ -44,7 +44,7 @@ enum GameForgeEvent: Decodable {
 
 struct MessagePayload: Decodable {
     let agent: String
-    let model: String
+    let model: String?
     let content: String
     let tokensIn: Int?
     let tokensOut: Int?
@@ -81,14 +81,14 @@ struct GameReadyPayload: Decodable {
 
 struct ScreenshotPayload: Decodable {
     let agent: String
-    let model: String
+    let model: String?
     let base64: String
     let description: String
 }
 
 struct GhostPayload: Decodable {
     let agent: String
-    let model: String
+    let model: String?
     let trigger: String
     let response: String
 }
@@ -101,7 +101,7 @@ struct LoopPayload: Decodable {
 
 struct ToolCallPayload: Decodable {
     let agent: String
-    let model: String
+    let model: String?
     let tool: String
     let result: String
 }

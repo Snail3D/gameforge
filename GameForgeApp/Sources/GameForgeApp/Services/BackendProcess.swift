@@ -2,6 +2,7 @@ import Foundation
 
 final class BackendProcess {
     private var process: Process?
+    private var outputPipe: Pipe?
     private let projectDir: URL
     var onLog: ((String) -> Void)?
     var onTerminated: (() -> Void)?
@@ -13,26 +14,24 @@ final class BackendProcess {
     func start(mode: String, preset: String, prompt: String) throws {
         let proc = Process()
 
-        // Resolve node path from shell
-        let nodePath = resolveNodePath()
-        let npxPath = nodePath.deletingLastPathComponent().appendingPathComponent("npx").path
-
-        proc.executableURL = URL(fileURLWithPath: npxPath)
-        proc.arguments = ["tsx", "src/index.ts", "--mode=\(mode)", "--preset=\(preset)", prompt]
+        // Use /usr/bin/env to find npx via PATH — works with nvm, fnm, homebrew, etc.
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        proc.arguments = ["npx", "tsx", "src/index.ts", "--mode=\(mode)", "--preset=\(preset)", prompt]
         proc.currentDirectoryURL = projectDir
 
-        // Inherit PATH from shell
+        // Get PATH from user's shell
         var env = ProcessInfo.processInfo.environment
         if let shellPath = getShellPath() {
             env["PATH"] = shellPath
         }
         proc.environment = env
 
-        let outPipe = Pipe()
-        proc.standardOutput = outPipe
-        proc.standardError = outPipe
+        let pipe = Pipe()
+        self.outputPipe = pipe
+        proc.standardOutput = pipe
+        proc.standardError = pipe
 
-        outPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if let str = String(data: data, encoding: .utf8), !str.isEmpty {
                 self?.onLog?(str)
@@ -48,22 +47,10 @@ final class BackendProcess {
     }
 
     func stop() {
-        process?.interrupt() // SIGINT for graceful shutdown
-    }
-
-    private func resolveNodePath() -> URL {
-        // Try common locations
-        let paths = [
-            "/opt/homebrew/bin/node",
-            "/usr/local/bin/node",
-            "/usr/bin/node"
-        ]
-        for p in paths {
-            if FileManager.default.fileExists(atPath: p) {
-                return URL(fileURLWithPath: p)
-            }
-        }
-        return URL(fileURLWithPath: "/opt/homebrew/bin/node")
+        outputPipe?.fileHandleForReading.readabilityHandler = nil
+        outputPipe = nil
+        process?.interrupt()
+        process = nil
     }
 
     private func getShellPath() -> String? {
@@ -72,6 +59,7 @@ final class BackendProcess {
         proc.arguments = ["-l", "-c", "echo $PATH"]
         let pipe = Pipe()
         proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
         try? proc.run()
         proc.waitUntilExit()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
