@@ -8,6 +8,7 @@ const state = {
     player_score: 0,
     ai_score: 0,
     game_phase: 'PLAYER_TURN',
+    game_winner: null,
     ai_heatmap: Array.from({length: 10}, () => Array.from({length: 10}, () => 0.5))
 };
 
@@ -16,7 +17,23 @@ const ai_grid = Array.from({length: 10}, () => Array.from({length: 10}, () => ({
 const gridConfig = { cellSize: 20, originX: 100, originY: 150 };
 
 const AI_TARGET = {x: 5, y: 5};
-const player_fleet = [{ name: "Carrier", length: 5, current_hp: 5, coordinates: [{x:0,y:0},{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0}] }];
+const player_fleet = [{ 
+    name: "Carrier", 
+    length: 5, 
+    current_hp: 5, 
+    status: 'ALIVE',
+    coordinates: [{x:0,y:0},{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0}] 
+}];
+
+// Mirroring AI fleet for logic symmetry
+const ai_fleet = [{ 
+    name: "Submarine", 
+    length: 3, 
+    current_hp: 3, 
+    status: 'ALIVE',
+    coordinates: [{x:5,y:5},{x:5,y:6},{x:5,y:7}] 
+}];
+
 const shot_history = [];
 
 class MCTSNode {
@@ -156,6 +173,16 @@ function updateBayesianInference() {
     }
 }
 
+function checkGameOver() {
+    if (ai_fleet.every(s => s.current_hp <= 0)) {
+        state.game_phase = 'GAME_OVER';
+        state.game_winner = 'PLAYER';
+    } else if (player_fleet.every(s => s.current_hp <= 0)) {
+        state.game_phase = 'GAME_OVER';
+        state.game_winner = 'AI';
+    }
+}
+
 async function Fire(gridX, gridY) {
     if (gridX < 0 || gridX >= 10 || gridY < 0 || gridY >= 10) return;
     if (state.game_phase !== 'PLAYER_TURN') return;
@@ -163,7 +190,20 @@ async function Fire(gridX, gridY) {
     const target_cell = ai_grid[gridY][gridX];
     shot_history.push({x: gridX, y: gridY});
     
-    if (gridX === 5 && gridY === 5) {
+    // Check Player Attack vs AI Fleet
+    let hitFound = false;
+    for (let ship of ai_fleet) {
+        if (ship.status !== 'SUNK' && ship.coordinates.some(c => c.x === gridX && c.y === gridY)) {
+            ship.current_hp -= 1;
+            hitFound = true;
+            if (ship.current_hp <= 0) {
+                ship.status = 'SUNK';
+            }
+            break;
+        }
+    }
+
+    if (hitFound) {
         target_cell.state = 'HIT';
         state.player_score++;
     } else {
@@ -176,25 +216,48 @@ async function Fire(gridX, gridY) {
     setTimeout(async () => {
         const move = Compute_AI_Move();
         
-        // Apply AI Shot
-        const ai_target_cell = ai_grid[move.y][move.x];
-        const isAiHit = (move.x === 0 && move.y === 0); // Mirroring logic for player's specific win coord
-        
-        // For simplicity in this demo, if AI hits our predefined 0,0
-        if (move.x === 0 && move.y === 0) {
-            state.ai_score++;
+        // AI Attack vs Player Fleet
+        const ai_target_cell = player_grid[move.y][move.x];
+        let aiHitFound = false;
+        for (let ship of player_fleet) {
+            if (ship.status !== 'SUNK' && ship.coordinates.some(c => c.x === move.x && c.y === move.y)) {
+                ship.current_hp -= 1;
+                aiHitFound = true;
+                if (ship.current_hp <= 0) {
+                    ship.status = 'SUNK';
+                }
+                break;
+            }
         }
 
+        // Update AI scoring and grid visual
+        const ai_grid_cell = ai_grid[move.y][move.x];
+        if (aiHitFound) {
+            ai_grid_cell.state = 'HIT';
+            state.ai_score++;
+        } else {
+            ai_grid_cell.state = 'MISS';
+        }
+        
+        player_grid[move.y][move.x].state = aiHitFound ? 'HIT' : 'MISS';
+
         state.turn_count++;
-        state.game_phase = 'PLAYER_TURN';
+        
+        checkGameOver();
+        
+        if (state.game_phase !== 'GAME_OVER') {
+            state.game_phase = 'PLAYER_TURN';
+        }
     }, 600);
 }
 
 canvas.addEventListener('click', (e) => {
+    if (state.game_phase === 'GAME_OVER') return;
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
+    const mouseX = e.clientX - rect.array.left; // Note: fixed rect.left logic
+    const mouseX_fixed = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const actualX = Math.floor((mouseX - gridConfig.originX) / gridConfig.cellSize);
+    const actualX = Math.floor((mouseX_fixed - gridConfig.originX) / gridConfig.cellSize);
     const actualY = Math.floor((mouseY - gridConfig.originY) / gridConfig.cellSize);
 
     if (actualX >= 0 && actualX < 10 && actualY >= 0 && actualY < 10) {
@@ -205,6 +268,14 @@ canvas.addEventListener('click', (e) => {
 function update() {}
 
 function render() {
+    ctx.save();
+    
+    if (state.game_phase === 'GAME_OVER') {
+        ctx.filter = 'grayscale(0.8)';
+        let jitter = Math.random() * 5;
+        ctx.translate(jitter, 0);
+    }
+
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
@@ -222,7 +293,7 @@ function render() {
     ctx.lineWidth = 1;
     for (let i = 0; i <= 10; i++) {
         ctx.beginPath();
-        ctx.moveTo(originX + (i * 20), originY);
+        ctx.moveTo(originX + (i * 20), origin.Y || originY);
         ctx.lineTo(originX + (i * 20), originY + 200);
         ctx.stroke();
         ctx.beginPath();
@@ -257,21 +328,49 @@ function render() {
     }
 
     player_fleet.forEach(ship => {
+        const isSunk = ship.status === 'SUNK';
+        const glitch = isSunk && Math.random() > 0.7;
+
         ship.coordinates.forEach(coord => {
             const drawX = originX + (coord.x * 20);
             const drawY = originY + (coord.y * 20);
-            ctx.strokeStyle = '#00FFFF';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(drawX + 2, drawY + 2, 16, 16);
+            
+            if (glitch) {
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 3;
+            } else {
+                ctx.strokeStyle = '#00FFFF';
+                ctx.lineWidth = 2;
+            }
+
+            ctx.strokeRect(drawX + 2 + (glitch ? Math.random()*4 : 0), 
+                           drawY + 2 + (glitch ? Math.random()*4 : 0), 
+                           16, 16);
         });
     });
 
     ctx.fillStyle = '#00FFFF';
     ctx.textAlign = 'center';
     ctx.font = '16px monospace';
-    ctx.fillText('TURN: ' + state.turn_count, 200, 50);
+    ctx.fillText('TURN: ' + state.turn_control || state.turn_count, 200, 50);
     ctx.fillText('PLAYER: ' + state.player_score + ' | AI: ' + state.ai_score, 200, 80);
     ctx.fillText('PHASE: ' + state.game_phase, 200, 110);
+
+    if (state.game_phase === 'GAME_OVER') {
+        const pulse = Math.sin(Date.now() * 0.01) * 15 + 15;
+        ctx.shadowBlur = pulse;
+        ctx.shadowColor = state.game_winner === 'PLAYER' ? '#00FF00' : '#FF0000';
+        ctx.fillStyle = state.game_winner === 'PLAYER' ? '#00FF00' : '#FF0000';
+        ctx.font = '40px monospace';
+        ctx.fillText('WINNER: ' + state.game_winner, 200, 350);
+        ctx.shadowBlur = 0;
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.font = '14px monospace';
+        ctx.fillText('Click to restart (refresh page)', 200, 380);
+    }
+
+    ctx.restore();
 }
 
 function gameLoop() {

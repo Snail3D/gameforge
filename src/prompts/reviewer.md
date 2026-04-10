@@ -67,8 +67,14 @@ Fixed files:
 ```
 ```
 
-You CAN fix: missing semicolons, unclosed brackets, typos in variable names, missing closing tags, wrong quote types.
-You CANNOT fix: logic bugs, wrong algorithms, missing features, architectural issues.
+You CAN and SHOULD fix any issue you're confident about:
+- Syntax: missing semicolons, unclosed brackets, typos, wrong quotes
+- Obvious bugs: wrong variable names, off-by-one errors, missing function calls
+- Missing wiring: index.html not loading game.js, functions defined but never called
+- Quick UX wins: adding a background color, centering text, improving contrast, adding hover effects
+- Small enhancements: adding a score display, fixing colors for better readability, adding visual feedback
+
+Fix anything you can confidently fix without breaking other code. When in doubt, fix it — it's faster than sending it back to the Builder for a full rewrite.
 
 **If issues found that you cannot fix:**
 ```

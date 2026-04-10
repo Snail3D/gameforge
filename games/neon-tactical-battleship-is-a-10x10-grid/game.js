@@ -8,6 +8,7 @@ const state = {
     player_score: 0,
     ai_score: 0,
     game_phase: 'PLAYER_TURN',
+    game_winner: null,
     ai_heatmap: Array.from({length: 10}, () => Array.from({length: 10}, () => 0.5))
 };
 
@@ -172,6 +173,16 @@ function updateBayesianInference() {
     }
 }
 
+function checkGameOver() {
+    if (ai_fleet.every(s => s.current_hp <= 0)) {
+        state.game_phase = 'GAME_OVER';
+        state.game_winner = 'PLAYER';
+    } else if (player_fleet.every(s => s.current_hp <= 0)) {
+        state.game_phase = 'GAME_OVER';
+        state.game_winner = 'AI';
+    }
+}
+
 async function Fire(gridX, gridY) {
     if (gridX < 0 || gridX >= 10 || gridY < 0 || gridY >= 10) return;
     if (state.game_phase !== 'PLAYER_TURN') return;
@@ -231,15 +242,21 @@ async function Fire(gridX, gridY) {
         player_grid[move.y][move.x].state = aiHitFound ? 'HIT' : 'MISS';
 
         state.turn_count++;
-        state.game_phase = 'PLAYER_TURN';
+        
+        checkGameOver();
+        
+        if (state.game_phase !== 'GAME_OVER') {
+            state.game_phase = 'PLAYER_TURN';
+        }
     }, 600);
 }
 
 canvas.addEventListener('click', (e) => {
+    if (state.game_phase === 'GAME_OVER') return;
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
+    const mouseX_fixed = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const actualX = Math.floor((mouseX - gridConfig.originX) / gridConfig.cellSize);
+    const actualX = Math.floor((mouseX_fixed - gridConfig.originX) / gridConfig.cellSize);
     const actualY = Math.floor((mouseY - gridConfig.originY) / gridConfig.cellSize);
 
     if (actualX >= 0 && actualX < 10 && actualY >= 0 && actualY < 10) {
@@ -250,6 +267,14 @@ canvas.addEventListener('click', (e) => {
 function update() {}
 
 function render() {
+    ctx.save();
+    
+    if (state.game_phase === 'GAME_OVER') {
+        ctx.filter = 'grayscale(0.8)';
+        let jitter = Math.random() * 5;
+        ctx.translate(jitter, 0);
+    }
+
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
@@ -280,7 +305,7 @@ function render() {
         for (let x = 0; x < 10; x++) {
             const cell = ai_grid[y][x];
             const cellX = originX + (x * 20);
-            const cellY = originPointsY = originY + (y * 20);
+            const cellY = originY + (y * 20);
             const intensity = state.ai_heatmap[y][x];
             if (intensity > 0) {
                 ctx.fillStyle = 'rgba(0, 255, 255, ' + (Math.min(intensity * 0.8, 1.0)) + ')';
@@ -329,6 +354,22 @@ function render() {
     ctx.fillText('TURN: ' + state.turn_count, 200, 50);
     ctx.fillText('PLAYER: ' + state.player_score + ' | AI: ' + state.ai_score, 200, 80);
     ctx.fillText('PHASE: ' + state.game_phase, 200, 110);
+
+    if (state.game_phase === 'GAME_OVER') {
+        const pulse = Math.sin(Date.now() * 0.01) * 15 + 15;
+        ctx.shadowBlur = pulse;
+        ctx.shadowColor = state.game_winner === 'PLAYER' ? '#00FF00' : '#FF0000';
+        ctx.fillStyle = state.game_winner === 'PLAYER' ? '#00FF00' : '#FF0000';
+        ctx.font = '40px monospace';
+        ctx.fillText('WINNER: ' + state.game_winner, 200, 350);
+        ctx.shadowBlur = 0;
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.font = '14px monospace';
+        ctx.fillText('Click to restart (refresh page)', 200, 380);
+    }
+
+    ctx.restore();
 }
 
 function gameLoop() {
