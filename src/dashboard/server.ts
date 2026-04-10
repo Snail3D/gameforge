@@ -9,6 +9,7 @@ export interface DashboardServer {
   broadcaster: EventBroadcaster;
   close: () => void;
   serveGameDir: (gameDir: string) => void;
+  onStart: (callback: (opts: { prompt: string; mode: string; preset: string }) => void) => void;
 }
 
 export function startDashboard(port: number): DashboardServer {
@@ -22,9 +23,110 @@ export function startDashboard(port: number): DashboardServer {
   const publicDir = resolve(__dirname, 'public');
   app.use(express.static(publicDir));
 
+  app.use(express.json());
+
   // Health check endpoint
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() });
+  });
+
+  // === GAMEFORGE API — for Hermes skills and external tools ===
+
+  // GET /api/status — current build status
+  app.get('/api/status', (_req, res) => {
+    const history = broadcaster.getHistory();
+    const steps = history.filter((e: any) => e.type === 'step_update');
+    const lastStats = [...history].reverse().find((e: any) => e.type === 'system_stats') as any;
+    const passed = steps.filter((e: any) => e.status === 'passed').length;
+    const failed = steps.filter((e: any) => e.status === 'failed').length;
+    const skipped = steps.filter((e: any) => e.status === 'skipped').length;
+
+    res.json({
+      running: history.length > 0,
+      gameDir: currentGameDir,
+      steps: { passed, failed, skipped },
+      cycles: lastStats?.cycles || 0,
+      uptimeSeconds: lastStats?.uptimeSeconds || 0,
+      totalEvents: history.length,
+    });
+  });
+
+  // GET /api/steps — list all steps with status
+  app.get('/api/steps', (_req, res) => {
+    const history = broadcaster.getHistory();
+    const stepMap = new Map<string, any>();
+
+    for (const event of history) {
+      const e = event as any;
+      if (e.type === 'step_assign') {
+        stepMap.set(e.stepId, { stepId: e.stepId, title: e.title, status: 'in_progress', attempt: 0 });
+      } else if (e.type === 'step_update') {
+        const step = stepMap.get(e.stepId);
+        if (step) {
+          step.status = e.status;
+          step.attempt = e.attempt;
+        }
+      }
+    }
+
+    res.json({ steps: Array.from(stepMap.values()) });
+  });
+
+  // GET /api/messages — recent agent messages
+  app.get('/api/messages', (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const history = broadcaster.getHistory();
+    const messages = history
+      .filter((e: any) => e.type === 'message')
+      .slice(-limit)
+      .map((e: any) => ({
+        agent: e.agent,
+        content: e.content?.substring(0, 500),
+        model: e.model,
+        tokPerSec: e.tokPerSec,
+        ts: e.ts,
+      }));
+    res.json({ messages });
+  });
+
+  // GET /api/game — get current game files
+  app.get('/api/game/files', (_req, res) => {
+    if (!currentGameDir) {
+      res.status(404).json({ error: 'No game in progress' });
+      return;
+    }
+    const fs = require('fs');
+    const path = require('path');
+    const files: Record<string, string> = {};
+    try {
+      const entries = fs.readdirSync(currentGameDir);
+      for (const entry of entries) {
+        const fullPath = path.join(currentGameDir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile() && !entry.endsWith('.backup') && !entry.startsWith('.')) {
+          files[entry] = fs.readFileSync(fullPath, 'utf-8');
+        }
+      }
+    } catch { /* ignore */ }
+    res.json({ gameDir: currentGameDir, files });
+  });
+
+  // POST /api/start — start a new game build (for Hermes skill)
+  // Body: { prompt: "Make a chess game", mode: "build", preset: "e4b" }
+  let onStartCallback: ((opts: { prompt: string; mode: string; preset: string }) => void) | null = null;
+
+  app.post('/api/start', (req, res) => {
+    const { prompt, mode, preset } = req.body || {};
+    if (!prompt) {
+      res.status(400).json({ error: 'prompt is required' });
+      return;
+    }
+    if (onStartCallback) {
+      onStartCallback({ prompt, mode: mode || 'build', preset: preset || 'e4b' });
+      res.json({ status: 'started', prompt, mode: mode || 'build', preset: preset || 'e4b' });
+    } else {
+      res.status(503).json({ error: 'No start handler registered' });
+    }
   });
 
   // Screenshot capture — dashboard client captures via iframe postMessage and sends back
@@ -92,6 +194,9 @@ export function startDashboard(port: number): DashboardServer {
     close: () => server.close(),
     serveGameDir: (gameDir: string) => {
       currentGameDir = gameDir;
+    },
+    onStart: (callback) => {
+      onStartCallback = callback;
     },
   };
 }

@@ -3,21 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess AI</title>
+    <title>Chess Game</title>
     <style>
         body {
-            background-color: #111111;
-            color: #FFFFFF;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            background-color: #f0f0f0;
+        }
+        #chessCanvas {
+            border: 1px solid black;
+            background-color: #ffffff;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="800" style="border: 2px solid #AAAAAA; display: block;"></canvas>
+    <canvas id="chessCanvas" width="720" height="720"></canvas>
     <script src="game.js"></script>
 </body>
 </html>
