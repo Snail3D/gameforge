@@ -180,13 +180,33 @@ export class FormedBuilder extends EventEmitter {
     try {
       const existing = this.fileTools.readFile(fragment.file);
       if (existing && !existing.startsWith('<!--') && existing.length > 20) {
-        parts.push('\nCurrent ' + fragment.file + ' (you MUST include ALL existing code plus your additions):');
+        parts.push('\nCurrent ' + fragment.file + ' (include ALL this code plus your additions):');
         parts.push(existing);
       }
     } catch { /* new file */ }
 
+    // Show OTHER project files so model knows what globals/functions exist
+    try {
+      const allFiles = this.fileTools.listFiles();
+      const otherJsFiles = allFiles.filter(f =>
+        f.endsWith('.js') && f !== fragment.file && !f.endsWith('.backup') && !f.includes('_meta')
+      );
+      if (otherJsFiles.length > 0) {
+        parts.push('\nOther project files (these are loaded via <script> tags, you can use their globals):');
+        for (const f of otherJsFiles) {
+          try {
+            const content = this.fileTools.readFile(f);
+            if (content.length > 20) {
+              parts.push('--- ' + f + ' ---');
+              parts.push(content);
+            }
+          } catch { /* skip */ }
+        }
+      }
+    } catch { /* no files yet */ }
+
     parts.push('\nTask: ' + fragment.question);
-    parts.push('\nWrite the COMPLETE updated ' + fragment.file + '. Include ALL existing code plus the new code for this step. Output the full file, nothing else.');
+    parts.push('\nWrite the COMPLETE ' + fragment.file + '. Output the full file, nothing else.');
 
     return parts.join('\n');
   }

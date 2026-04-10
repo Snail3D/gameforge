@@ -55,11 +55,26 @@ Also pre-load these algorithms into the ghost.json `ghostEntries` so if the Buil
 
 ## Platform Constraints
 
-ALL games are exactly TWO files:
-1. `index.html` — loads the canvas and includes `<script src="game.js"></script>`. Nothing else.
-2. `game.js` — ALL game logic in ONE file. No splitting into multiple JS files.
+Games use MULTIPLE small files. Each file stays under 150 lines.
 
-Do NOT use `<script type="module">`. Do NOT use ES6 imports. Just a plain `<script src="game.js">` tag.
+Structure:
+1. `index.html` — canvas + loads all JS files via `<script>` tags in the correct order
+2. Multiple JS files, each with ONE clear responsibility:
+   - `board.js` — board state, initialization, board drawing
+   - `pieces.js` — piece types, movement rules, legal move generation
+   - `input.js` — keyboard, mouse, touch handlers
+   - `render.js` — all drawing/rendering functions
+   - `ai.js` — AI logic, evaluation, search (if applicable)
+   - `game.js` — game loop, turn management, win/lose detection, init call
+
+Adapt file names to the game type. A platformer might have `player.js`, `level.js`, `physics.js`. A puzzle game might have `grid.js`, `solver.js`.
+
+Rules:
+- Each file under 150 lines. If a file grows past 150, split it in the next step.
+- Each step creates or modifies only 1-2 files. NEVER touch more than 2 files per step.
+- `index.html` must load scripts in dependency order (board before pieces, pieces before game, etc.)
+- No ES6 modules or imports — use plain `<script>` tags. All files share the global scope.
+- `game.js` is always loaded LAST and contains the initialization call.
 
 Rules:
 - Vanilla JS — no TypeScript, no React, no Vue, no bundlers

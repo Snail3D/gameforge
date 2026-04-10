@@ -26,14 +26,17 @@ IMPORTANT: Always include the file path after the colon. This is how your code g
 
 Every game MUST follow this exact structure:
 
-1. **One `index.html`** that loads one `game.js` via a script tag:
+1. **One `index.html`** that loads multiple JS files in order:
 ```html
+<script src="board.js"></script>
+<script src="render.js"></script>
+<script src="input.js"></script>
 <script src="game.js"></script>
 ```
 
-2. **One `game.js`** that contains ALL game logic. Do NOT split into multiple JS files. One file. Everything in it.
+2. **Multiple small JS files** — each under 150 lines, one responsibility each. All share global scope (no imports/exports).
 
-3. **The `index.html` template** — every game starts from this exact template. Modify the title and canvas size as needed, but keep this structure:
+3. **The `index.html` template:**
 ```html
 <!DOCTYPE html>
 <html>
@@ -44,17 +47,21 @@ Every game MUST follow this exact structure:
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #000; max-width: 100%; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
+        canvas { background: #000; max-width: 100vw; max-height: 100vh; }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <canvas id="gameCanvas" width="640" height="640"></canvas>
+    <!-- Load scripts in dependency order -->
+    <script src="board.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
 ```
 
-4. **The `game.js` template** — always start with canvas setup:
+4. **Each step modifies only 1-2 files.** When you write a file, write the COMPLETE file — all code from top to bottom. Never write "// rest unchanged" — write the actual code.
+
+5. **The first JS file** should start with canvas setup:
 ```js
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
