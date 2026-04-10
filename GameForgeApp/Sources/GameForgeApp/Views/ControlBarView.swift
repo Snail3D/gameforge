@@ -59,8 +59,9 @@ struct ControlBarView: View {
                 Text("Single (32GB)").tag("single")
                 Text("E4B (16GB)").tag("e4b")
                 Text("E2B (8GB)").tag("e2b")
+                Text("MiniMax (Cloud)").tag("minimax")
             }
-            .frame(width: 120)
+            .frame(width: 140)
 
             Spacer()
 
@@ -105,6 +106,7 @@ struct ControlBarView: View {
         case "single": return .cyan
         case "e4b": return .orange
         case "e2b": return .yellow
+        case "minimax": return .purple
         default: return .gray
         }
     }
