@@ -44,7 +44,7 @@ Every game MUST follow this exact structure:
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #000; max-width: 100%; height: auto; }
+        canvas { background: #000; max-width: 100%; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
     </style>
 </head>
 <body>

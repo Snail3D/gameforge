@@ -339,7 +339,8 @@ export class Supervisor extends EventEmitter {
     let criticFeedback: string | undefined;
     const attempts: StepLogEntry['attempts'] = [];
 
-    for (let attempt = 1; attempt <= step.maxAttempts; attempt++) {
+    // Ralph loop — never skip, keep trying until it works
+    for (let attempt = 1; ; attempt++) {
       this.loopDetector!.reset();
       this.heartbeat!.ping();
 
@@ -662,7 +663,8 @@ export class Supervisor extends EventEmitter {
 
     let criticFeedback: string | undefined;
 
-    for (let attempt = 1; attempt <= step.maxAttempts; attempt++) {
+    // Ralph loop — never skip, keep trying until it works
+    for (let attempt = 1; ; attempt++) {
       this.heartbeat!.ping();
 
       // On retry, add critic feedback to the step context
