@@ -77,6 +77,14 @@ export class Supervisor extends EventEmitter {
     this.running = true;
     this.startTime = Date.now();
 
+    // Unload ALL Ollama models before starting — clean Metal slate
+    try {
+      const loaded = await this.modelManager.getLoadedModels();
+      for (const model of loaded) {
+        await this.modelManager.unloadModel(model.name);
+      }
+    } catch { /* Ollama might not be running for cloud presets */ }
+
     const plan = await this.runPlanner();
     await this.runBuildLoop(plan);
   }
