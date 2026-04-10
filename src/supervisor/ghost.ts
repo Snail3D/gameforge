@@ -80,7 +80,7 @@ export class Ghost {
     }
 
     try {
-      const res = await fetch(`${this.smartConfig.baseUrl}/chat/completions`, {
+      const res = await fetch(`${this.smartConfig.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

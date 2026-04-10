@@ -80,7 +80,7 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
 
   // For minimax preset, override host to MiniMax API
   const host = preset === 'minimax'
-    ? (process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io/v1')
+    ? (process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io')
     : (process.env['OLLAMA_HOST'] ?? 'http://localhost:11434');
 
   return {
@@ -101,7 +101,7 @@ export function loadConfig(overrides?: Partial<GameForgeConfig>): GameForgeConfi
     // Cloud reviewer (MiniMax) — if MINIMAX_API_KEY is set, use it for reviews
     ...(process.env['MINIMAX_API_KEY'] ? {
       reviewer: {
-        baseUrl: process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io/v1',
+        baseUrl: process.env['MINIMAX_BASE_URL'] ?? 'https://api.minimax.io',
         model: process.env['MINIMAX_MODEL'] ?? 'MiniMax-M2.7-highspeed',
         apiKey: process.env['MINIMAX_API_KEY'],
       },
