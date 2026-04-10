@@ -81,10 +81,26 @@ final class AppState {
     }
 
     func stop() {
-        backend?.stop()
         wsClient?.disconnect()
+        wsClient = nil
         fileWatcher?.stop()
+        fileWatcher = nil
+        backend?.stop()
+        backend = nil
         isRunning = false
+        messages = []
+        steps = []
+        streamingBuffers = [:]
+        progress = 0
+        cycles = 0
+        gameDir = nil
+
+        // Force kill anything on port 9191
+        let killProc = Process()
+        killProc.executableURL = URL(fileURLWithPath: "/bin/sh")
+        killProc.arguments = ["-c", "lsof -ti :9191 | xargs kill -9 2>/dev/null"]
+        try? killProc.run()
+        killProc.waitUntilExit()
     }
 
     private func connectWebSocket() {
