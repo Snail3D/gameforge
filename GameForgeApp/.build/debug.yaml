@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "GameForgeApp-arm64-apple-macosx-debug.exe": ["<GameForgeApp-arm64-apple-macosx-debug.exe>"]
+  "GameForgeApp-arm64-apple-macosx-debug.module": ["<GameForgeApp-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<GameForgeApp-arm64-apple-macosx-debug.exe>","<GameForgeApp-arm64-apple-macosx-debug.module>"]
+  "test": ["<GameForgeApp-arm64-apple-macosx-debug.exe>","<GameForgeApp-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp":
+    is-mutated: true
+commands:
+  "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp-entitlement.plist"]
+    description: "Write auxiliary file /Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp-entitlement.plist"
+
+  "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/ContentView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/GameForgeApp.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/AppState.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/GameForgeEvent.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/BackendProcess.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/FileWatcher.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/WebSocketClient.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/AgentChatView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/ControlBarView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/GamePreviewView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/MessageBubbleView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/StepListView.swift"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/sources"]
+    description: "Write auxiliary file /Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/sources"
+
+  "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swift.o"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.product/Objects.LinkFileList"
+
+  "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<GameForgeApp-arm64-apple-macosx-debug.exe>":
+    tool: phony
+    inputs: ["<GameForgeApp-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    outputs: ["<GameForgeApp-arm64-apple-macosx-debug.exe>"]
+
+  "<GameForgeApp-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/Modules/GameForgeApp.swiftmodule"]
+    outputs: ["<GameForgeApp-arm64-apple-macosx-debug.module>"]
+
+  "C.GameForgeApp-arm64-apple-macosx-debug.exe":
+    tool: shell
+    inputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.product/Objects.LinkFileList"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/GameForgeApp"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug","-o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp","-module-name","GameForgeApp","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_GameForgeApp_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/Modules/GameForgeApp.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.GameForgeApp-arm64-apple-macosx-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp-entitlement.plist"]
+    outputs: ["<GameForgeApp-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/GameForgeApp"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp-entitlement.plist","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp"]
+
+  "C.GameForgeApp-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/ContentView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/GameForgeApp.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/AppState.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/GameForgeEvent.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/BackendProcess.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/FileWatcher.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/WebSocketClient.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/AgentChatView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/ControlBarView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/GamePreviewView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/MessageBubbleView.swift","/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/StepListView.swift","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/sources"]
+    outputs: ["/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swift.o","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/Modules/GameForgeApp.swiftmodule"]
+    description: "Compiling Swift Module 'GameForgeApp' (12 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","GameForgeApp","-emit-dependencies","-emit-module","-emit-module-path","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/Modules/GameForgeApp.swiftmodule","-output-file-map","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/output-file-map.json","-incremental","-c","@/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/sources","-I","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j18","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","GameForgeApp_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","gameforgeapp"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/","/Users/snailmac/gameforge/GameForgeApp/Package.swift","/Users/snailmac/gameforge/GameForgeApp/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

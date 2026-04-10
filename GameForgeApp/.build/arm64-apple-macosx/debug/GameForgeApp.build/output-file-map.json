@@ -1,0 +1,89 @@
+{
+  "": {
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/primary.swiftdeps"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/ContentView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ContentView.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/GameForgeApp.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeApp.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/AppState.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AppState.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Models/GameForgeEvent.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GameForgeEvent.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/BackendProcess.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/BackendProcess.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/FileWatcher.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/FileWatcher.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Services/WebSocketClient.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/WebSocketClient.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/AgentChatView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/AgentChatView.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/ControlBarView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/ControlBarView.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/GamePreviewView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/GamePreviewView.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/MessageBubbleView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/MessageBubbleView.dia"
+  },
+  "/Users/snailmac/gameforge/GameForgeApp/Sources/GameForgeApp/Views/StepListView.swift": {
+    "dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.d",
+    "object": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swift.o",
+    "swiftmodule": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView~partial.swiftmodule",
+    "swift-dependencies": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.swiftdeps",
+    "diagnostics": "/Users/snailmac/gameforge/GameForgeApp/.build/arm64-apple-macosx/debug/GameForgeApp.build/StepListView.dia"
+  }
+}
