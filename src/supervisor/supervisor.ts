@@ -106,7 +106,7 @@ export class Supervisor extends EventEmitter {
         tokensIn: 0, tokensOut: 0, tokPerSec: 0,
       });
 
-      if (this.config.preset !== "minimax") await this.modelManager.loadModel(plannerModel);
+      if (this.config.preset !== "minimax" && this.config.preset !== "qwopus") await this.modelManager.loadModel(plannerModel);
 
       const generator = new RecipeGenerator({
         client: new LLMClient({ baseUrl: this.config.ollama.host, apiKey: this.config.ollama.apiKey, model: plannerModel, apiKey: this.config.ollama.apiKey }),
@@ -145,7 +145,7 @@ export class Supervisor extends EventEmitter {
 
       const sameModel = plannerModel === builderModel;
       if (!sameModel) {
-        if (this.config.preset !== "minimax") await this.modelManager.unloadModel(plannerModel);
+        if (this.config.preset !== "minimax" && this.config.preset !== "qwopus") await this.modelManager.unloadModel(plannerModel);
       }
 
       // Set up game directory
@@ -185,7 +185,7 @@ export class Supervisor extends EventEmitter {
       loading: plannerModel,
     });
 
-    if (this.config.preset !== "minimax") await this.modelManager.loadModel(plannerModel);
+    if (this.config.preset !== "minimax" && this.config.preset !== "qwopus") await this.modelManager.loadModel(plannerModel);
 
     const plannerPromptPath = resolve(process.cwd(), 'src/prompts/planner.md');
     const plannerSystemPrompt = readFileSync(plannerPromptPath, 'utf-8');
@@ -216,7 +216,7 @@ export class Supervisor extends EventEmitter {
 
     const sameModel = plannerModel === builderModel;
     if (!sameModel) {
-      if (this.config.preset !== "minimax") await this.modelManager.unloadModel(plannerModel);
+      if (this.config.preset !== "minimax" && this.config.preset !== "qwopus") await this.modelManager.unloadModel(plannerModel);
 
       this.emitEvent({
         type: 'model_swap',
@@ -252,7 +252,7 @@ export class Supervisor extends EventEmitter {
 
   private async runBuildLoop(plan: BuildPlan): Promise<void> {
     const builderModel = this.config.ollama.models.builder;
-    if (this.config.preset !== "minimax") await this.modelManager.loadModel(builderModel);
+    if (this.config.preset !== "minimax" && this.config.preset !== "qwopus") await this.modelManager.loadModel(builderModel);
 
     // Use MiniMax for Ghost smart answers if available, otherwise local scout model
     const ghostConfig = this.config.reviewer
