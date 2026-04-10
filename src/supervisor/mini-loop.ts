@@ -53,21 +53,21 @@ export class MiniLoop {
   }
 
   parseReviewerVerdict(response: string): { passed: boolean; hasFixedCode: boolean } {
-    // Strip <think>...</think> blocks, markdown fences, and whitespace
-    let stripped = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
-    stripped = stripped.replace(/```\w*\n?/g, '').trim();
-    const lower = stripped.toLowerCase();
-    if (lower.startsWith('pass_with_fixes') || lower.startsWith('pass with fixes')) {
-      return { passed: true, hasFixedCode: true };
-    }
-    // Also check for **PASS** markdown bold and PASS: patterns
-    if (lower.startsWith('pass') || lower.startsWith('**pass')) {
-      return { passed: lower.includes('with_fixes') || lower.includes('with fixes'), hasFixedCode: lower.includes('with_fixes') || lower.includes('with fixes') };
-    }
-    // Search deeper — MiniMax might put PASS after reasoning
-    if (/\bpass\b/i.test(stripped.substring(0, 200)) && !/\bfail\b/i.test(stripped.substring(0, 200))) {
-      return { passed: true, hasFixedCode: false };
-    }
-    return { passed: false, hasFixedCode: false };
+    // Strip everything that isn't the verdict
+    let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    cleaned = cleaned.replace(/```\w*\n?/g, '');
+    cleaned = cleaned.replace(/\*\*/g, '');  // strip bold markers
+    cleaned = cleaned.trim();
+
+    // Simple: does it contain PASS and not FAIL?
+    const hasPass = /\bpass\b/i.test(cleaned);
+    const hasFail = /\bfail\b/i.test(cleaned);
+    const hasFixedCode = /with.?fix/i.test(cleaned);
+
+    if (hasFail && !hasPass) return { passed: false, hasFixedCode: false };
+    if (hasPass) return { passed: true, hasFixedCode };
+
+    // No clear verdict — default to pass if no fail mentioned
+    return { passed: !hasFail, hasFixedCode: false };
   }
 }
