@@ -684,6 +684,12 @@ export class Supervisor extends EventEmitter {
       // Execute all fragments
       const result = await formedBuilder.executeStep(formedStep);
 
+      // If syntax rollback happened, this step failed — retry
+      if (!result.success) {
+        criticFeedback = 'The code you wrote had a syntax error and was rolled back. Try again — write only valid JavaScript. Do not use void return types, do not redeclare existing variables.';
+        continue;
+      }
+
       // Show what files were saved
       const savedFiles = Object.keys(result.files);
       if (savedFiles.length > 0) {

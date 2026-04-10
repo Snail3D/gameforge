@@ -129,6 +129,7 @@ export class FormedBuilder extends EventEmitter {
     }
 
     // Backup and write with syntax validation
+    let hadRollback = false;
     for (const [path, content] of Object.entries(files)) {
       let backup = '';
       try {
@@ -151,13 +152,15 @@ export class FormedBuilder extends EventEmitter {
             tokPerSec: 0,
           });
           finalContent = backup;
+          hadRollback = true;
         }
       }
 
       this.fileTools.writeFile(path, finalContent);
     }
 
-    return { files, success: Object.keys(files).length > 0, fragments: collected };
+    // If we rolled back, the step failed — return success: false so the Supervisor retries
+    return { files, success: !hadRollback && Object.keys(files).length > 0, fragments: collected };
   }
 
   async decomposeStep(step: StepDefinition): Promise<FormedBuildStep> {
