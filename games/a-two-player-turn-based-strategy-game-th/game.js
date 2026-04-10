@@ -20,6 +20,8 @@ let lastObstacleTime = 0;
 let score = 0;
 let gameOver = false;
 let animationId = null;
+let lastRender = null;
+const keys = {};
 
 function resetGame() {
     player.x = canvas.width / 2 - player.width / 2;
@@ -28,6 +30,7 @@ function resetGame() {
     gameOver = false;
     lastObstacleTime = performance.now();
     cancelAnimationFrame(animationId);
+    lastRender = null;
     animationId = requestAnimationFrame(gameLoop);
 }
 
@@ -46,16 +49,13 @@ function spawnObstacle() {
 
 function update(deltaTime) {
     if (gameOver) return;
-    // Player movement
     if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
     if (keys['ArrowRight'] && player.x + player.width < canvas.width) player.x += player.speed;
 
-    // Obstacle movement
     obstacles.forEach(ob => {
         ob.y += ob.speed;
     });
 
-    // Remove off-screen obstacles and increment score
     obstacles = obstacles.filter(ob => {
         if (ob.y - ob.size > canvas.height) {
             score += 1;
@@ -64,7 +64,6 @@ function update(deltaTime) {
         return true;
     });
 
-    // Collision detection
     for (let ob of obstacles) {
         if (rectCircleCollide(player, ob)) {
             gameOver = true;
@@ -72,7 +71,6 @@ function update(deltaTime) {
         }
     }
 
-    // Spawn new obstacles
     if (performance.now() - lastObstacleTime > obstacleSpawnInterval) {
         spawnObstacle();
         lastObstacleTime = performance.now();
@@ -94,14 +92,21 @@ function rectCircleCollide(rect, circle) {
     return (dx * dx + dy * dy <= (circle.size / 2) * (circle.size / 2));
 }
 
+function drawBoard() {
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBoard();
 
-    // Draw player
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    // Draw obstacles
     obstacles.forEach(ob => {
         ctx.fillStyle = ob.color;
         ctx.beginPath();
@@ -109,12 +114,10 @@ function draw() {
         ctx.fill();
     });
 
-    // Draw score
     ctx.fillStyle = '#000';
     ctx.font = '20px Arial';
     ctx.fillText(`Score: ${score}`, 10, 30);
 
-    // Draw game over
     if (gameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -136,8 +139,6 @@ function gameLoop(timestamp) {
     lastRender = timestamp;
     animationId = requestAnimationFrame(gameLoop);
 }
-let lastRender = null;
-const keys = {};
 
 window.addEventListener('keydown', e => {
     keys[e.key] = true;
