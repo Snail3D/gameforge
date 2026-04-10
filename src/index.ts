@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { loadConfig } from './config.js';
 import type { ModelPreset } from './config.js';
 import { Supervisor } from './supervisor/supervisor.js';
