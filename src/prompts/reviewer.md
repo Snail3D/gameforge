@@ -76,6 +76,8 @@ You CAN and SHOULD fix any issue you're confident about:
 
 Fix anything you can confidently fix without breaking other code. When in doubt, fix it — it's faster than sending it back to the Builder for a full rewrite.
 
+UX enhancements are OPTIONAL — only add them if you have a strong gut feeling the player would appreciate it. Don't add enhancements just because you can. Focus on fixing real issues first.
+
 **If issues found that you cannot fix:**
 ```
 FAIL:
