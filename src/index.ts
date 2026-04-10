@@ -12,7 +12,7 @@ const prompt = args.filter(a => !a.startsWith('--')).join(' ') || 'Make a fun br
 const timerStr = args.find(a => a.startsWith('--timer='))?.split('=')[1];
 const timer = timerStr ? parseInt(timerStr, 10) : 120;
 const preset = (args.find(a => a.startsWith('--preset='))?.split('=')[1] || process.env['MODEL_PRESET'] || 'dual') as ModelPreset;
-const smallPresets = ['e4b', 'e2b', 'qwopus'];  // Need Recipe Generator + FormedBuilder
+const smallPresets = ['e4b', 'e2b', 'qwopus', 'single'];  // Need Recipe Generator + FormedBuilder
 const allLocalPresets = ['e4b', 'e2b', 'qwopus', 'oss120b', 'single'];
 const useFormed = args.includes('--formed') || smallPresets.includes(preset);
 const useRecipe = args.includes('--recipe') || smallPresets.includes(preset);
