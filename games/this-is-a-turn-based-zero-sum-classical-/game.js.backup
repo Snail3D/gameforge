@@ -1,0 +1,270 @@
+const WIDTH = 720;
+const HEIGHT = 720;
+const SIDE_LENGTH = 90;
+const COLOR_DARK = "#795548";
+const COLOR_LIGHT = "#F0D9B5";
+
+// Game State Variables
+let boardState = [];
+let currentTurn = "White";
+let gameStateStatus = "IN_PROGRESS";
+
+/**
+ * Defines the structure for a Piece object.
+ * @typedef {Object} Piece
+ * @property {string} type - The type of piece ('P', 'R', 'N', 'B', 'Q', 'K').
+ * @property {'White' | 'Black'} color - The color of the piece.
+ */
+
+/**
+ * Initializes the 8x8 board state array with null (representing empty squares).
+ * @returns {Array<Array<null | Piece>>} The initialized board state.
+ */
+function initializeBoard() {
+    let board = [];
+    for (let i = 0; i < 8; i++) {
+        board[i] = [];
+        for (let j = 0; j < 8; j++) {
+            board[i][j] = null;
+        }
+    }
+    return board;
+}
+
+/**
+ * Creates a standardized piece object.
+ * @param {string} type - The piece type.
+ * @param {'White' | 'Black'} color - The color.
+ * @returns {Piece} A new piece object.
+ */
+function createPiece(type, color) {
+    return { type: type, color: color };
+}
+
+/**
+ * Creates a piece object and sets it directly onto the specified board location.
+ * @param {string} type - The piece type.
+ * @param {'White' | 'Black'} color - The color.
+ * @param {number} r - The row index (0-7).
+ * @param {number} c - The column index (0-7).
+ * @returns {Piece} The created piece object.
+ */
+function createPieceAt(type, color, r, c) {
+    const piece = createPiece(type, color);
+    boardState[r][c] = piece;
+    return piece;
+}
+
+/**
+ * Initializes the 8x8 board state array and places all 32 starting pieces.
+ * Populates the boardState array systematically for all 32 pieces.
+ */
+function setInitialPieces(board) {
+    const ROOK = 'R';
+    const KNIGHT = 'N';
+    const BISHOP = 'B';
+    const QUEEN = 'Q';
+    const KING = 'K';
+    const PAWN = 'P';
+
+    // The piece arrangement for a rank of 8 pieces
+    const pieceOrder = [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK];
+
+    // White pieces setup: Ranks 1 (index 0) and 2 (index 1)
+    // Rank 1 (Back Rank, r=0)
+    for (let c = 0; c < 8; c++) {
+        createPieceAt(pieceOrder[c], 'White', 0, c);
+    }
+    // Rank 2 (Pawns, r=1)
+    for (let c = 0; c < 8; c++) {
+        createPieceAt(PAWN, 'White', 1, c);
+    }
+
+    // Black pieces setup: Ranks 8 (index 7) and 7 (index 6)
+    // Rank 8 (Back Rank, r=7)
+    for (let c = 0; c < 8; c++) {
+        createPieceAt(pieceOrder[c], 'Black', 7, c);
+    }
+    // Rank 7 (Pawns, r=6)
+    for (let c = 0; c < 8; c++) {
+        createPieceAt(PAWN, 'Black', 6, c);
+    }
+}
+
+/**
+ * Draws the chessboard grid and sets up the initial background.
+ * @param {CanvasRenderingContext2D} ctx - The context to draw on.
+ */
+function drawBoardGrid(ctx) {
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            // Standard chess coloring: (r+c)%2 = 0 is one color, 1 is the other.
+            // Assuming the top-left (0,0) corresponds to a 'dark' square for this implementation.
+            const finalColor = ((r + c) % 2 === 0) ? COLOR_DARK : COLOR_LIGHT;
+            
+            const x = c * SIDE_LENGTH;
+            const y = r * SIDE_LENGTH;
+            
+            ctx.fillStyle = finalColor;
+            ctx.fillRect(x, y, SIDE_LENGTH, SIDE_LENGTH);
+        }
+    }
+}
+
+/**
+ * Maps piece types to Unicode symbols and determines display color.
+ * @param {Piece | null} piece - The piece object or null.
+ * @returns {{symbol: string, color: string}} The symbol and its display color.
+ */
+function getPieceDisplayInfo(piece) {
+    if (!piece) return { symbol: '', color: 'transparent' };
+    
+    let symbol;
+    let color;
+
+    if (piece.color === 'White') {
+        // White symbols (Uppercase Unicode)
+        switch (piece.type) {
+            case 'R': symbol = '♖'; break;
+            case 'N': symbol = '♘'; break;
+            case 'B': symbol = '♗'; break;
+            case 'Q': symbol = '♕'; break;
+            case 'K': symbol = '♔'; break;
+            case 'P': symbol = '♙'; break;
+            default: symbol = '?';
+        }
+        color = '#000'; // Black text color
+    } else { // Black
+        // Black symbols (Unicode usually renders darker/black)
+        switch (piece.type) {
+            case 'R': symbol = '♜'; break;
+            case 'N': symbol = '♞'; break;
+            case 'B': symbol = '♝'; break;
+            case 'Q': symbol = '♛'; break;
+            case 'K': symbol = '♚'; break;
+            case 'P': symbol = '♟'; break;
+            default: symbol = '?';
+        }
+        color = '#FFF'; // White text color (Allows the contrast of the unicode symbol)
+    }
+    return { symbol, color };
+}
+
+/**
+ * Draws all pieces currently on the board state.
+ * @param {CanvasRenderingContext2D} ctx - The context to draw on.
+ */
+function drawPieces(ctx) {
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const piece = boardState[r][c];
+            if (piece) {
+                const { symbol, color } = getPieceDisplayInfo(piece);
+                
+                const x = c * SIDE_LENGTH;
+                const y = r * SIDE_LENGTH;
+                
+                // Use a font size that looks good across the square
+                ctx.font = `${SIDE_LENGTH * 0.7}px Arial Unicode MS`; 
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillStyle = color;
+                ctx.fillText(symbol, x + SIDE_LENGTH / 2, y + SIDE_LENGTH / 2);
+            }
+        }
+    }
+}
+
+/**
+ * Main function to draw the entire game state (Board + Pieces).
+ * @param {CanvasRenderingContext2D} ctx - The canvas context.
+ */
+function drawGame(ctx) {
+    // 1. Draw background grid
+    drawBoardGrid(ctx);
+    
+    // 2. Draw all pieces on top of the grid
+    drawPieces(ctx);
+
+    // 3. Optional: Draw status text
+    ctx.font = "24px Arial";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.textAlign = 'left';
+    ctx.fillText(`Turn: ${currentTurn} | Status: ${gameStateStatus}`, 20, 30);
+}
+
+/**
+ * Initializes the global game state and draws the starting board.
+ */
+function initializeGame() {
+    const canvas = document.getElementById('chessCanvas');
+    if (!canvas) {
+        console.error("Canvas element with ID 'chessCanvas' not found.");
+        return;
+    }
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas completely before initialization
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    // Reset state
+    boardState = initializeBoard();
+    setInitialPieces(boardState);
+    currentTurn = "White";
+    gameStateStatus = "IN_PROGRESS";
+
+    // Draw the initial state
+    drawGame(ctx);
+    
+    console.log("Game Canvas Initialized and Board Drawn.");
+    
+    // Add a basic click listener placeholder
+    canvas.addEventListener('click', handleCanvasClick);
+}
+
+/**
+ * Placeholder for handling board interaction (e.g., piece selection, move attempt).
+ * @param {MouseEvent} event - The click event.
+ */
+function handleCanvasClick(event) {
+    // Calculate coordinates relative to the canvas
+    const rect = event.target;
+    const canvasX = event.offsetX;
+    const canvasY = event.offsetY;
+
+    // Determine which square was clicked (c, r)
+    const c = Math.floor(canvasX / SIDE_LENGTH);
+    const r = Math.floor(canvasY / SIDE_LENGTH);
+
+    if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+        console.log(`Attempted click on square (${toReadableColumn(c)}, ${toReadableRow(r)})`);
+        // In a real game, logic would go here to handle selection/movement
+    } else {
+        console.log("Clicked outside board boundaries.");
+    }
+}
+
+/** Helper to make column indices readable (a, b, c...) */
+function toReadableColumn(c) {
+    let alpha = '';
+    let temp;
+    let i = c;
+    while (i >= 0) {
+        temp = i % 26;
+        alpha = String.fromCharCode(97 + temp) + alpha;
+        i = Math.floor(i / 26);
+    }
+    return alpha;
+}
+
+/** Helper to make row indices readable (1, 2, 3...) */
+function toReadableRow(r) {
+    // Row index r=0 (top) corresponds to Rank 8.
+    // Row index r=7 (bottom) corresponds to Rank 1.
+    // Rank number = 8 - r
+    return 8 - r; 
+}
+
+// Event listener to start the game loop/initialization
+window.onload = initializeGame;
