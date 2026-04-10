@@ -1,5 +1,11 @@
 .omc/
 node_modules/
+.build/
+GameForgeApp/.build/
+*.o
+*.dia
+*.d
+*.swiftdeps
 dist/
 .env
 *.key
