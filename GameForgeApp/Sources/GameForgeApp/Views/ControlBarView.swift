@@ -56,7 +56,7 @@ struct ControlBarView: View {
 
             Picker("", selection: $state.preset) {
                 Text("Dual (128GB)").tag("dual")
-                Text("Single (32GB)").tag("single")
+                Text("MoE 26B (32GB)").tag("single")
                 Text("E4B (16GB)").tag("e4b")
                 Text("E2B (8GB)").tag("e2b")
                 Text("OSS 120B (65GB)").tag("oss120b")
