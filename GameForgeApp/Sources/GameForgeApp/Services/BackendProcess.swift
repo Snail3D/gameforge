@@ -14,16 +14,23 @@ final class BackendProcess {
     func start(mode: String, preset: String, prompt: String) throws {
         let proc = Process()
 
-        // Use /usr/bin/env to find npx via PATH — works with nvm, fnm, homebrew, etc.
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         proc.arguments = ["npx", "tsx", "src/index.ts", "--mode=\(mode)", "--preset=\(preset)", prompt]
         proc.currentDirectoryURL = projectDir
 
-        // Get PATH from user's shell
+        // Hardcode common PATH locations — no shell spawn, no blocking
         var env = ProcessInfo.processInfo.environment
-        if let shellPath = getShellPath() {
-            env["PATH"] = shellPath
-        }
+        let extraPaths = [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            NSHomeDirectory() + "/.local/bin",
+            NSHomeDirectory() + "/.cargo/bin",
+        ]
+        let existingPath = env["PATH"] ?? ""
+        env["PATH"] = (extraPaths + existingPath.split(separator: ":").map(String.init)).joined(separator: ":")
         proc.environment = env
 
         let pipe = Pipe()
@@ -51,18 +58,5 @@ final class BackendProcess {
         outputPipe = nil
         process?.interrupt()
         process = nil
-    }
-
-    private func getShellPath() -> String? {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        proc.arguments = ["-l", "-c", "echo $PATH"]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-        try? proc.run()
-        proc.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
