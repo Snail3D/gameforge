@@ -1,1076 +1,145 @@
-const canvas = document.getElementById("gameCanvas"),
-    ctx = canvas.getContext("2d"),
-    W = 400,
-    H = 700;
+const canvas = document.getElementById("gameCanvas");
+const ctx2d = canvas.getContext("2d");
+const W = 400;
+const H = 700;
 
-// --- Game Constants & Setup ---
-const BOARD_SIZE = 8;
-const SQUARE_W = W / BOARD_SIZE;
-const SQUARE_H = H / BOARD_SIZE;
+// Board Configuration
+const BOARD_SIZE = 400;
+const SQUARE_SIZE = BOARD_SIZE / 8;
 
-// Colors for the board
-const COLOR_LIGHT = '#ebe1d7';
-const COLOR_DARK = '#b58d63';
+// Piece mapping: Uppercase = White, Lowercase = Black
+const board = [
+    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+];
 
-// State Tracking
-let board = [];
-let selectedSquare = { row: null, col: null }; // Stores the coordinates of the currently selected piece
-let selectedMoveTargets = []; // Stores [{row: r, col: c}] for visual feedback
-let currentPlayer = 'White'; // White starts (We assume human plays White)
-const AI_PLAYER = 'Black'; // Assume AI plays Black
-
-// Animation State Tracking
-let isAnimating = false;
-let animationQueue = [];
-let animationFrameId = null;
-
-// History tracking for complex moves (En Passant, Castling)
-let history = []; 
-const MAX_HISTORY = 10;
-
-// Piece types (Using the Unicode keys as case-insensitive identifiers for logic)
-const PIECES_BLACK = ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜']; 
-// White pieces (bottom of the board, rank 7)
-const PIECES_WHITE = ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖'];
-
-// Material Values for AI evaluation
-const PIECE_VALUES = {
-    '♙': 1, '♟': 1, // Pawns
-    '♘': 3, '♞': 3, // Knights
-    '♗': 3, '♝': 3, // Bishops
-    '♕': 5, '♛': 5, // Queens
-    '♖': 5, '♜': 5, // Rooks
-    '♔': 0, '♚': 0 // Kings are invaluable, so we assign 0 for material comparison
+const unicodePieces = {
+    'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
+    'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
 };
 
-// Positional weights for better AI evaluation (Very basic example)
-// Weights are conceptual; a real engine uses complex tables.
-const POSITIONAL_BONUS = {
-    '♙': 0,
-    '♘': 1, '♞': 1,
-    '♗': 1, '♝': 1,
-    '♕': 0, '♛': 0,
-    '♖': 0, '♜': 0,
-    '♔': 2, '♚': 2 // Minor bonus for king position (trying to keep it safe/central)
-};
+// Game State
+let selectedSquare = null; // {row, col}
+let statusMessage = "Select a piece to move";
 
+function draw() {
+    // 1. Clear Background
+    ctx2d.fillStyle = "#1a1a1a";
+    ctx2d.fillRect(0, 0, W, H);
 
-/**
- * Helper function to check if coordinates are within board bounds.
- * @param {number} r - Row.
- * @param {number} c - Column.
- * @returns {boolean}
- */
-function isWithinBounds(r, c) {
-    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
-}
+    // 2. Draw Chessboard
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            // Alternating Square Colors
+            ctx2d.fillStyle = (row + col) % 2 === 0 ? "#eeeed2" : "#769656";
+            ctx2d.fillRect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
 
-/**
- * Retrieves the piece character at (r, c) on the current board state.
- * @param {number} r - Row.
- * @param {number} c - Column.
- * @returns {string|null}
- */
-function getPieceAt(r, c) {
-    if (!isWithinBounds(r, c)) return null;
-    return board[r][c];
-}
-
-
-/**
- * Determines the color of a piece based on its character.
- * @param {string} piece - The piece character.
- * @returns {'White' | 'Black' | null}
- */
-function getPieceColor(piece) {
-    if (!piece) return null;
-    const blackPiecesCodes = ['♜', '♞', '♝', '♛', '♚', '♟'];
-    const whitePiecesCodes = ['♖', '♘', '♗', '♕', '♔', '♙'];
-    
-    if (blackPiecesCodes.includes(piece)) {
-        return 'Black';
-    } else if (whitePiecesCodes.includes(piece)) {
-        return 'White';
-    }
-    return null;
-}
-
-
-/**
- * Helper Board State: Deep copy of the current board state.
- * @returns {Array<Array<string|null>>} A copy of the current board.
- */
-function copyBoard() {
-    return board.map(row => [...row]);
-}
-
-/**
- * Places a piece on the simulated board.
- */
-function setPiece(simBoard, r, c, piece) {
-    if (!isWithinBounds(r, c)) return;
-    simBoard[r][c] = piece;
-}
-
-/**
- * Determines if a piece at a given coordinate belongs to the specified player.
- * @param {number} r - Row.
- * @param {number} c - Column.
- * @param {string} player - 'White' or 'Black'.
- * @returns {boolean}
- */
-function isPlayerPiece(r, c, player) {
-    const piece = getPieceAt(r, c);
-    if (!piece) return false;
-
-    const pieceColor = getPieceColor(piece);
-
-    return pieceColor && pieceColor === player;
-}
-
-/**
- * Initializes the standard starting board state.
- * Row 0 is the top of the canvas (rank 8 for black).
- * Row 7 is the bottom of the canvas (rank 1 for white).
- */
-function setupBoard() {
-    board = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        board[r] = [];
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            board[r][c] = null; // Null means empty
-        }
-    }
-
-    // Set Black pieces (Rank 8, displayed at board row 0)
-    for (let c = 0; c < 8; c++) {
-        board[0][c] = PIECES_BLACK[c];
-    }
-    // Set Black Pawns (Rank 7, displayed at board row 1)
-    for (let c = 0; c < 8; c++) {
-        board[1][c] = '♟'; // Pawn symbol for black
-    }
-
-    // Set White Pawns (Rank 2, displayed at board row 6)
-    for (let c = 0; c < 8; c++) {
-        board[6][c] = '♙'; // Pawn symbol for white
-    }
-    // Set White pieces (Rank 1, displayed at board row 7)
-    for (let c = 0; c < 8; c++) {
-        board[7][c] = PIECES_WHITE[c];
-    }
-    
-    currentPlayer = 'White';
-    gameStatus = "White to move";
-    
-    // Reset animation state
-    isAnimating = false;
-    animationQueue = [];
-    history = [];
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    drawBoard();
-}
-
-/**
- * Draws the chessboard pattern, pieces, and selection highlight.
- * @param {boolean} isSelected - Placeholder argument (unused in final version).
- */
-function drawBoard(isSelected = false) {
-    if (isAnimating) return; 
-    drawAnimatedBoard(board);
-}
-
-
-/**
- * Interpolation helper: Calculates the pixel center point for a given (r, c).
- * @param {number} row - Board row.
- * @param {number} col - Board column.
- * @returns {{x: number, y: number}} Pixel center coordinates.
- */
-function getPixelCenter(row, col) {
-    return {
-        x: col * SQUARE_W + SQUARE_W / 2,
-        y: row * SQUARE_H + SQUARE_H / 2
-    };
-}
-
-/**
- * Draws the board state provided by the animation queue or current state.
- * @param {Array<Array<string|null>>} sourceBoard - The board state to draw from.
- * @param {Object} animData - Animation data, potentially including moving piece data.
- */
-function drawAnimatedBoard(sourceBoard, animData = null) {
-    ctx.clearRect(0, 0, W, H);
-
-    // 1. Draw Grid Background
-    for (let row = 0; row < BOARD_SIZE; row++) {
-        for (let col = 0; col < BOARD_SIZE; col++) {
-            const color = (row + col) % 2 === 0 ? COLOR_LIGHT : COLOR_DARK;
-            ctx.fillStyle = color;
-            ctx.fillRect(
-                col * SQUARE_W, 
-                row * SQUARE_H, 
-                SQUARE_W, 
-                SQUARE_H
-            );
-        }
-    }
-    
-    // 2. Draw Selection Highlight
-    if (selectedSquare.row !== null) {
-        const { row, col } = selectedSquare;
-        // Draw a semi-transparent yellow overlay on the selected square
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; 
-        ctx.fillRect(
-            col * SQUARE_W, 
-            row * SQUARE_H, 
-            SQUARE_W, 
-            SQUARE_H
-        );
-    }
-    
-    // 2B. Draw Move Targets (If provided)
-    if (selectedMoveTargets.length > 0) {
-        for (const { row, col } of selectedMoveTargets) {
-            // Draw a green circle/dot to indicate a valid move target
-            ctx.fillStyle = 'rgba(0, 150, 0, 0.6)';
-            ctx.beginPath();
-            ctx.arc(
-                col * SQUARE_W + SQUARE_W / 2, 
-                row * SQUARE_H + SQUARE_H / 2, 
-                Math.min(SQUARE_W, SQUARE_H) * 0.4, 
-                0, 
-                Math.PI * 2
-            );
-            ctx.fill();
-        }
-    }
-
-    // 3. Draw Pieces (Handling Animation Interpolation vs Static Board)
-    
-    let pieceToAnimate = null;
-    let startPos = null;
-    let endPos = null;
-    let renderSourceBoard = sourceBoard; 
-
-    if (animData && animData.movingPiece) {
-        pieceToAnimate = animData.movingPiece;
-        startPos = animData.startPixel;
-        endPos = animData.endPixel;
-    }
-
-
-    // Draw all static pieces from the source board
-    for (let row = 0; row < BOARD_SIZE; row++) {
-        for (let col = 0; col < BOARD_SIZE; col++) {
-            const piece = sourceBoard[row][col];
-            
-            if (piece) {
-                // Skip drawing the piece if it is the one currently animating
-                if (piece === pieceToAnimate && animData && animData.movingPiece) continue;
+            // Highlight Selected Square (Using a thick border for maximum visibility)
+            if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
+                ctx2d.strokeStyle = "#f7ff00"; // Bright Yellow
+                ctx2d.lineWidth = 4;
+                ctx2d.strokeRect(col * SQUARE_SIZE + 2, row * SQUARE_SIZE + 2, SQUARE_SIZE - 4, SQUARE_SIZE - 4);
                 
-                // Draw static pieces using discrete grid coords
-                const { x: centerX, y: centerY } = getPixelCenter(row, col);
-                drawPiece(ctx, piece, centerX, centerY, '#333', '#000');
+                // Also add a semi-transparent overlay for extra clarity
+                ctx2d.fillStyle = "rgba(247, 255, 0, 0.3)";
+                ctx2d.fillRect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
             }
-        }
-    }
 
-    // Draw the animated piece on top
-    if (pieceToAnimate && startPos && endPos) {
-        const { progress } = animData;
-        
-        const currentX = startPos.x + (endPos.x - startPos.x) * progress;
-        const currentY = startPos.y + (endPos.y - startPos.y) * progress;
-        
-        drawPiece(ctx, pieceToAnimate, currentX, currentY, '#333', '#000');
-    }
-
-
-    // 4. Draw Status Indicator
-    ctx.strokeStyle = '#ccc';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(
-        W * 0.02, H * 0.02, W * 0.96, H * 0.02
-    );
-    ctx.fillStyle = currentPlayer === 'White' ? 'white' : '#111';
-    ctx.globalAlpha = 0.8;
-    if (isAnimating) {
-        ctx.fillText(`Moving...`, W / 2, H * 0.05);
-    } else {
-        ctx.fillText(`Turn: ${currentPlayer} | Status: ${gameStatus}`, W / 2, H * 0.05);
-    }
-    ctx.globalAlpha = 1.0;
-}
-
-/**
- * Isolated drawing logic for piece rendering.
- */
-function drawPiece(ctx, piece, x, y, blackColor, whiteColor) {
-    // Font size adjusted slightly for better visibility on small screens
-    ctx.font = `${Math.min(SQUARE_W, SQUARE_H) * 0.9}px Arial`; 
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    ctx.strokeStyle = piece.match(/[♜♞♝♛♚♟]/) ? blackColor : whiteColor;
-    ctx.lineWidth = 1;
-    ctx.fillText(piece, x, y);
-}
-
-/**
- * Animation Loop Handler
- * @param {number} timestamp - Current time provided by requestAnimationFrame.
- */
-function animate(timestamp) {
-    if (animationQueue.length === 0) {
-        isAnimating = false;
-        console.log("Animation finished. Executing post-move logic.");
-        finalizeMoveAndSwitchTurn(); 
-        return;
-    }
-
-    // Process the next animation step
-    const currentStep = animationQueue.shift();
-    
-    let animData = null;
-
-    if (currentStep.move) {
-        const { startR, startC, endR, endC, duration } = currentStep.move;
-        const startTime = currentStep.startTime;
-        const elapsed = timestamp - startTime;
-
-        const progress = Math.min(1.0, elapsed / duration);
-        
-        // Interpolation calculation (Linear interpolation for position)
-        const startX = (startC * SQUARE_W + SQUARE_W / 2);
-        const startY = (startR * SQUARE_H + SQUARE_H / 2);
-        const endX = (endC * SQUARE_W + SQUARE_W / 2);
-        const endY = (endR * SQUARE_H + SQUARE_H / 2);
-
-        const currentX = startX + (endX - startX) * progress;
-        const currentY = startY + (endY - startY) * progress;
-
-        animData = {
-            movingPiece: getPieceAt(startR, startC),
-            startPixel: { x: startX, y: startY },
-            endPixel: { x: endX, y: endY },
-            progress: progress
-        };
-    }
-
-    // Draw the board representing the current step's configuration
-    drawAnimatedBoard(currentStep.boardState, animData);
-    
-    // Schedule the next frame
-    animationFrameId = requestAnimationFrame(animate);
-}
-
-/**
- * Executes a move with smooth animation feedback.
- * @param {number} startR - Starting row.
- * @param {number} startC - Starting column.
- * @param {number} endR - Ending row.
- * @param {number} endC - Ending column.
- * @returns {boolean} True if the move was queued/executed successfully, false otherwise.
- */
-function executeMove(startR, startC, endR, endC) {
-    // If already animating, do nothing until the current animation completes.
-    if (isAnimating) {
-        return false;
-    }
-    if (!isWithinBounds(startR, startC) || !isWithinBounds(endR, endC)) return false;
-
-    const pieceToMove = getPieceAt(startR, startC);
-    if (!pieceToMove) return false; // Should not happen if called correctly
-    
-    // 1. Validation (This now checks legality, including check safety)
-    const validMoves = getValidMoves(startR, startC);
-    const requiredMove = { startR, startC, endR: endR, endC: endC };
-    const isValidMove = validMoves.some(move => 
-        move.startR === requiredMove.startR && move.startC === requiredMove.startC && 
-        move.endR === requiredMove.endR && move.endC === requiredMove.endC
-    );
-
-    if (!isValidMove) {
-        console.error("Attempted to execute an invalid move (safety check failed or move type is illegal).");
-        return false;
-    }
-    
-    // 2. Setup Animation Queue
-    const moveDuration = 300; // Time in milliseconds for the transition
-    
-    // Create initial and final board states
-    const startBoardState = copyBoard();
-    const finalBoardState = copyBoard();
-    
-    // The piece moves from start to end
-    setPiece(finalBoardState, startR, startC, null);
-    setPiece(finalBoardState, endR, endC, pieceToMove);
-    
-    // Update history tracking before queueing animation
-    const moveRecord = { start: { r: startR, c: startC }, end: { r: endR, c: endC }, piece: pieceToMove };
-    history.push(moveRecord);
-    if (history.length > MAX_HISTORY) {
-        history.shift();
-    }
-
-    // Add the final resting state step LAST so it's processed LAST
-    animationQueue.push({
-        boardState: finalBoardState,
-        isFinalize: true
-    });
-
-    // Add the key animation step (drawing the motion)
-    animationQueue.push({
-        boardState: startBoardState,
-        move: { startR, startC, endR, endC, duration: moveDuration },
-        startTime: performance.now() // Set start time for animation loop
-    });
-    
-    // 3. Initiate Animation
-    isAnimating = true;
-    animationFrameId = requestAnimationFrame(animate);
-    
-    return true;
-}
-
-/**
- * Helper to cleanly handle the end of an animated move sequence:
- * This must be called when the move is visually complete.
- */
-function finalizeMoveAndSwitchTurn() {
-    // 1. Physically update the global board state.
-    const lastStep = animationQueue.find(step => step.isFinalize);
-    if (lastStep) {
-        board = copyBoard(lastStep.boardState);
-    }
-
-    // 2. Reset selection markers
-    selectedSquare = { row: null, col: null };
-    selectedMoveTargets = [];
-    
-    // 3. Determine next player and check for game end conditions
-    const wasWhiteTurn = (currentPlayer === 'White');
-    currentPlayer = (currentPlayer === 'White') ? 'Black' : 'White';
-    
-    // Check terminal state immediately after the board update
-    const terminalState = checkTerminalState(currentPlayer, board);
-    
-    if (terminalState.isCheckmate) {
-        gameStatus = `CHECKMATE! ${terminalState.winner} wins!`;
-    } else if (terminalState.isStalemate) {
-        gameStatus = "Stalemate! Game Draw.";
-    } else if (terminalState.isKingInCheck) {
-        gameStatus = `${currentPlayer} (Opponent) is in Check!`;
-    }
-    else {
-        gameStatus = `${currentPlayer} to move`;
-        // 4. Switch turn and potentially run AI
-        if (currentPlayer === AI_PLAYER) {
-            console.log("--- AI Turn Initiated ---");
-            makeAIMove(); 
-        } else {
-            drawBoard(); // Human move successful, waiting for next click.
-        }
-    }
-    
-    // Clear animation flags regardless of outcome
-    isAnimating = false;
-    animationFrameId = null;
-    animationQueue = [];
-}
-
-
-/* 
- * ==========================================================
- * CHECK AND MOVE LOGIC UTILITIES (Crucial Enhancements)
- * ==========================================================
- */
-
-/**
- * Checks if placing a piece at (r, c) would immediately move the *opponent's* King into check.
- * @param {Array<Array<string|null>>} tempBoard - The board state after the simulated move.
- * @param {'White'|'Black'} testingPlayer - The player whose king safety is being checked.
- * @returns {boolean} True if the King is safe (not in check).
- */
-function isMoveSafe(tempBoard, testingPlayer) {
-    const opponentColor = testingPlayer === 'White' ? 'Black' : 'White';
-    
-    // 1. Find the King's current position on the temp board
-    let kingPos = null;
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const piece = tempBoard[r][c];
-            // White King '♔', Black King '♚'
-            if (piece && getPieceColor(piece) === 'White' && piece === '♔' && testingPlayer === 'White') {
-                kingPos = { r, c };
-                break;
-            }
-            if (piece && getPieceColor(piece) === 'Black' && piece === '♚' && testingPlayer === 'Black') {
-                kingPos = { r, c };
-                break;
-            }
-        }
-        if (kingPos) break;
-    }
-
-    if (!kingPos) return true; 
-
-    // 2. Check if any opponent piece can attack the King's position (kingPos.r, kingPos.c)
-    
-    const opponents = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const piece = tempBoard[r][c];
-            const pieceColor = getPieceColor(piece);
-            
-            if (piece && pieceColor && pieceColor !== testingPlayer && pieceColor === opponentColor) {
-                opponents.push({ piece: piece, r: r, c: c });
-            }
-        }
-    }
-
-    for(const opponent of opponents) {
-        // Use the general valid move checker on the temporary board
-        const opponentMoves = getValidMovesForTesting(tempBoard, opponent.r, opponent.c, opponent.piece);
-        
-        // Check if any of those possible moves land on the King's square
-        const attacksKing = opponentMoves.some(move => 
-            move.endR === kingPos.r && move.endC === kingPos.c
-        );
-
-        if (attacksKing) {
-            // King IS in check
-            return false; 
-        }
-    }
-
-    return true; // King is safe
-}
-
-/**
- * Helper function to get valid moves for testing/safety checking on a specific temporary board state.
- * This incorporates Castling and En Passant logic. (Note: Full EP is still pending complex history tracking.)
- * @param {Array<Array<string|null>>} testBoard - The board to test moves against.
- * @param {number} r - Starting row.
- * @param {number} c - Starting column.
- * @param {string} piece - The piece character at (r, c).
- * @param {string} moveHistory = '' - Concatenated history (e.g., "e4..."). Used for EP.
- * @returns {Array<{startR: number, startC: number, endR: number, endC: number}>} Array of valid moves.
- */
-function getValidMovesForTesting(testBoard, r, c, piece, moveHistory = '') {
-    const moves = [];
-    if (!isWithinBounds(r, c)) return moves;
-    
-    const color = getPieceColor(piece);
-    if (!color) return moves;
-    
-    // Helper wrapper for testing
-    const isMoveTargetValidTest = (endR, endC, pieceColor, startR, startC) => {
-        if (!isWithinBounds(endR, endC)) return false;
-        const targetPiece = testBoard[endR][endC];
-        if (!targetPiece) return true;
-        const targetColor = getPieceColor(targetPiece);
-        return targetColor && targetColor !== pieceColor;
-    };
-
-    // Helper for sliding path checking
-    const checkSlidingPathTest = (dr, dc, maxSteps) => {
-        const pathMoves = [];
-        for (let i = 1; i <= maxSteps; i++) {
-            const nextR = r + dr * i;
-            const nextC = c + dc * i;
-
-            if (!isWithinBounds(nextR, nextC)) break;
-            
-            const targetPiece = testBoard[nextR][nextC];
-            
-            if (targetPiece) {
-                if (getPieceColor(targetPiece) !== color) {
-                    // Capture move found
-                    pathMoves.push({ startR: r, startC: c, endR: nextR, endC: nextC });
-                    break; // Cannot move further after capturing
-                } else {
-                    // Blocked by friendly piece
-                    break;
-                }
-            } else {
-                // Empty square
-                pathMoves.push({ startR: r, startC: c, endR: nextR, endC: nextC });
-            }
-        }
-        return pathMoves;
-    };
-    
-    // --- Piece Specific Logic ---
-    
-    // 1. PAWN MOVEMENT
-    if (piece.match(/♙|♟/)) { 
-        const isWhite = color === 'White';
-        const direction = isWhite ? -1 : 1; 
-        const startRank = isWhite ? 6 : 1; 
-        
-        // --- Standard Pawn Moves (1 square) ---
-        const oneStepR = r + direction;
-        const oneStepC = c;
-        if (isWithinBounds(oneStepR, oneStepC) && testBoard[oneStepR][oneStepC] === null) {
-            moves.push({ startR: r, startC: c, endR: oneStepR, endC: oneStepC });
-
-            // Double move check
-            if (r === startRank && isWithinBounds(r + 2 * direction, c) && testBoard[r + 2 * direction][c] === null) {
-                moves.push({ startR: r, startC: c, endR: r + 2 * direction, endC: c });
-            }
-        }
-
-        // Diagonal captures
-        const captureTargets = [[r + direction, c - 1], [r + direction, c + 1]];
-        for (const [endR, endC] of captureTargets) {
-            if (isWithinBounds(endR, endC)) {
-                const targetPiece = testBoard[endR][endC];
-                if (targetPiece && getPieceColor(targetPiece) !== color) {
-                    moves.push({ startR: r, startC: c, endR: endR, endC: endC });
-                }
-            }
-        }
-
-        // --- En Passant Check (Simplified Placeholder) ---
-    } 
-    
-    // Helper for sliding pieces
-    const addSlidingMovesTest = (directions, minSteps = 1, maxSteps = 8) => {
-        for (const { dr, dc } of directions) {
-            const pathMoves = checkSlidingPathTest(dr, dc, maxSteps); 
-            moves.push(...pathMoves);
-        }
-    };
-
-    // 2. ROOK/QUEEN MOVEMENT
-    const directions = [
-        { dr: 1, dc: 0 }, { dr: -1, dc: 0 }, 
-        { dr: 0, dc: 1 }, { dr: 0, dc: -1 } 
-    ];
-    
-    // 3. KNIGHT MOVEMENT
-    if (piece.match(/♞|♘/)) {
-        const knightMoves = [
-            { dr: -2, dc: -1 }, { dr: -2, dc: 1 }, 
-            { dr: -1, dc: -2 }, { dr: -1, dc: 2 },
-            { dr: 1, dc: -2 }, { dr: 1, dc: 2 },
-            { dr: 2, dc: -1 }, { dr: 2, dc: 1 }
-        ];
-        for (const { dr, dc } of knightMoves) {
-            const endR = r + dr;
-            const endC = c + dc;
-            if (isMoveTargetValidTest(endR, endC, color, r, c)) {
-                moves.push({ startR: r, startC: c, endR: endR, endC: endC });
-            }
-        }
-    }
-
-    // 4. BISHOP MOVEMENT
-    if (piece.match(/♝|♗/)) {
-        const diagonalDirections = [
-            { dr: 1, dc: 1 }, { dr: 1, dc: -1 }, 
-            { dr: -1, dc: 1 }, { dr: -1, dc: -1 }
-        ];
-        addSlidingMovesTest(diagonalDirections);
-    }
-
-    // 5. QUEEN MOVEMENT
-    if (piece.match(/♛|♕/)) {
-        addSlidingMovesTest(directions, 1, 8); // Rook moves
-        const diagonalDirections = [
-            { dr: 1, dc: 1 }, { dr: 1, dc: -1 }, 
-            { dr: -1, dc: 1 }, { dr: -1, dc: -1 }
-        ];
-        addSlidingMovesTest(diagonalDirections, 1, 8); // Bishop moves
-    }
-
-    // 6. KING MOVEMENT (Basic movement only, castling handled separately)
-    if (piece.match(/♚|♔/)) {
-        const kingDirections = [
-            { dr: -1, dc: 0 }, { dr: 1, dc: 0 }, 
-            { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
-            { dr: -1, dc: -1 }, { dr: -1, dc: 1 },
-            { dr: 1, dc: -1 }, { dr: 1, dc: 1 }
-        ];
-        for (const { dr, dc } of kingDirections) {
-            const endR = r + dr;
-            const endC = c + dc;
-            if (isMoveTargetValidTest(endR, endC, color, r, c)) {
-                moves.push({ startR: r, startC: c, endR: endR, endC: endC });
-            }
-        }
-    }
-    
-    // 7. CASTLING (Highly complex, simplified placeholder remains)
-    if (piece.match(/♚|♔/)) {
-        // Implementation omitted for brevity/complexity margin. Basic moves are sufficient for proving AI concept.
-    }
-    
-    // Filter unique moves
-    const uniqueMoves = {};
-    moves.forEach(move => {
-        const key = `${move.startR},${move.startC},${move.endR},${move.endC}`;
-        uniqueMoves[key] = move;
-    });
-    
-    return Object.values(uniqueMoves);
-}
-
-
-/**
- * Game Logic Helpers: Determines all valid moves (Pawn, Rook, Knight, Bishop, Queen, King, Castling).
- * This version filters ALL moves that leave the King in check.
- * @param {number} r - Starting row.
- * @param {number} c - Starting column.
- * @returns {Array<{startR: number, startC: number, endR: number, endC: number}>} Array of valid, check-safe moves.
- */
-function getValidMoves(r, c) {
-    // Pass empty history string to the basic checker function for now
-    const allPotentialMoves = getValidMovesForTesting(board, r, c, getPieceAt(r, c), "");
-    const currentPiece = getPieceAt(r, c);
-    const pieceColor = getPieceColor(currentPiece);
-    
-    if (!pieceColor) return [];
-
-    const safeMoves = [];
-
-    for (const move of allPotentialMoves) {
-        // 1. Create a temporary board state by applying the potential move
-        const tempBoard = copyBoard();
-        setPiece(tempBoard, move.startR, move.startC, null);
-        setPiece(tempBoard, move.endR, move.endC, currentPiece);
-        
-        // 2. Simulate the move to test safety
-        // Note: The move itself moves the King/piece, so we test the safety FOR the piece/King that moved.
-        const tempBoardAfterMove = copyBoard(tempBoard); 
-        
-        // 3. Check if the King of the originating player is safe on the resulting board state.
-        if (isMoveSafe(tempBoardAfterMove, pieceColor === 'White' ? 'White' : 'Black')) {
-            safeMoves.push(move);
-        }
-    }
-    return safeMoves;
-}
-
-
-/**
- * Checks if the current state represents a terminal condition (Check, Checkmate, Stalemate).
- * @param {'White'|'Black'} nextPlayer - The player whose turn it *should* be.
- * @param {Array<Array<string|null>>} currentBoard - The board state.
- * @returns {{isCheckmate: boolean, isStalemate: boolean, isKingInCheck: boolean, checkmateWinner: string|null}}
- */
-function checkTerminalState(nextPlayer, currentBoard) {
-    // The acting player is the one who just moved (i.e., the one whose King safety we test against)
-    const actingPlayer = nextPlayer === 'Black' ? 'White' : 'Black';
-    
-    // 1. Find King's position for the actingPlayer
-    let kingPos = null;
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const piece = currentBoard[r][c];
-            if (piece && getPieceColor(piece) === 'White' && piece === '♔' && actingPlayer === 'White') {
-                kingPos = { r, c };
-                break;
-            }
-            if (piece && getPieceColor(piece) === 'Black' && piece === '♚' && actingPlayer === 'Black') {
-                kingPos = { r, c };
-                break;
-            }
-        }
-        if (kingPos) break;
-    }
-    
-    // 2. Check if the King is currently in check
-    const isInCheck = !isMoveSafe(currentBoard, actingPlayer);
-    
-    // 3. Determine all legal moves for the actingPlayer
-    const allPossibleMoves = getAllValidMovesForPlayer(actingPlayer);
-    
-    if (allPossibleMoves.length === 0) {
-        if (isInCheck) {
-            // Checkmate: The King was in check, but there are no escape moves.
-            return { isCheckmate: true, isStalemate: false, isKingInCheck: true, checkmateWinner: nextPlayer };
-        } else {
-            // Stalemate: No moves, and King was not in check.
-            return { isCheckmate: false, isStalemate: true, isKingInCheck: false, checkmateWinner: null };
-        }
-    }
-
-    return { isCheckmate: false, isStalemate: false, isKingInCheck: isInCheck, checkmateWinner: null };
-}
-
-
-/**
- * Gets all valid moves for a player on the current board state.
- * @param {'White'|'Black'} player - The player to generate moves for.
- * @returns {Array<{startR: number, startC: number, endR: number, endC: number}>}
- */
-function getAllValidMovesForPlayer(player) {
-    const validMoves = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const piece = getPieceAt(r, c);
-            if (piece && getPieceColor(piece) === player) {
-                // Pass empty history string since we are generating possibilities, not executing
-                const moves = getValidMoves(r, c); 
-                validMoves.push(...moves);
-            }
-        }
-    }
-    return validMoves;
-}
-
-
-/**
- * EVALUATION FUNCTION: Calculates the material score change after simulating a move.
- * IMPROVEMENT: Incorporates a basic positional bonus based on piece type.
- * @param {Array<Array<string|null>>} boardAfterMove - The board state after the move.
- * @param {string} movingPlayerColor - The color of the player who just moved.
- * @param {number} capturedPieceValue - Material value of piece captured (0 if none).
- * @returns {number} The net score change (+ score for movingPlayer, - score for opponent).
- */
-function evaluateMoveMaterial(boardAfterMove, movingPlayerColor, capturedPieceValue) {
-    // 1. Calculate Positional Score of the entire board for White vs Black perspective
-    let selfPositionalScore = 0;
-    let opponentPositionalScore = 0;
-
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const piece = boardAfterMove[r][c];
+            // Draw Piece
+            const piece = board[row][col];
             if (piece) {
-                const pieceColor = getPieceColor(piece);
-                let positionalValue = POSITIONAL_BONUS[piece] || 0;
-                
-                // Simple central bias: Center squares (3,3), (4,2), etc., reward pieces.
-                const centerInfluence = Math.abs(3 - Math.abs(r - 3)) + Math.abs(3 - Math.abs(c - 3));
-                let modifiedValue = positionalValue + (centerInfluence * 0.1);
-
-                if (pieceColor === movingPlayerColor) {
-                    selfPositionalScore += modifiedValue;
-                } else if (pieceColor !== movingPlayerColor) {
-                    opponentPositionalScore += modifiedValue;
-                }
+                drawPiece(piece, col, row);
             }
         }
     }
-    
-    // 2. Material Gain from Capture
-    let materialGain = capturedPieceValue;
 
-    // 3. Net Score Calculation: (Self Material + Self Position Bonus) - (Opponent Material + Opponent Position Bonus)
-    // Since we are evaluating the *future* state, we calculate the difference in potential overall score.
-    const score = (
-        (selfPositionalScore + materialGain) - 
-        opponentPositionalScore
-    );
-    
-    return score;
+    // 3. Draw UI Panel
+    const UI_Y = BOARD_SIZE;
+    ctx2d.fillStyle = "#2c2c2c";
+    ctx2d.fillRect(0, UI_Y, W, H - UI_Y);
+
+    // Divider Line
+    ctx2d.strokeStyle = "#444";
+    ctx2d.lineWidth = 2;
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, UI_Y);
+    ctx2d.lineTo(W, UI_Y);
+    ctx2d.stroke();
+
+    // Text Info
+    ctx2d.fillStyle = "#ffffff";
+    ctx2d.font = "bold 28px Arial";
+    ctx2d.textAlign = "center";
+    ctx2d.fillText("CHESS AI", W / 2, UI_Y + 50);
+
+    ctx2d.fillStyle = "#aaa";
+    ctx2d.font = "18px Arial";
+    ctx2d.fillText(statusMessage, W / 2, UI_Y + 100);
 }
 
-
-/**
- * AI Move Calculation: Finds the move that maximizes the material advantage.
- * If multiple moves result in the same score, it picks one randomly.
- */
-function makeAIMove() {
-    if (isAnimating) return;
-
-    // 1. Find all valid moves for the AI (Black)
-    const blackMoves = getAllValidMovesForPlayer('Black');
-    
-    if (blackMoves.length === 0) {
-        console.warn("AI has no available moves.");
-        gameStatus = "AI cannot move. Game Over?";
-        drawBoard();
-        return;
-    }
-
-    let bestScore = -Infinity;
-    let bestMoves = [];
-
-    // 2. Evaluate each move
-    for (const move of blackMoves) {
-        // Create a temporary board to test the outcome
-        const tempBoard = copyBoard();
-        
-        // Simulate the move: move piece, capture piece
-        const startPiece = getPieceAt(move.startR, move.startC);
-        const capturedPiece = getPieceAt(move.endR, move.endC);
-        
-        setPiece(tempBoard, move.startR, move.startC, null);
-        setPiece(tempBoard, move.endR, move.endC, startPiece);
-        
-        // Evaluate the resulting board state's material balance
-        const score = evaluateMoveMaterial(
-            tempBoard, 
-            'Black', // Black is the moving player
-            capturedPiece ? PIECE_VALUES[capturedPiece] || 0 : 0
-        );
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMoves = [move];
-        } else if (score === bestScore) {
-            bestMoves.push(move);
-        }
-    }
-
-    // 3. Select the move (randomly if ties exist)
-    const chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    
-    console.log(`AI chose move: (${chosenMove.startR}, ${chosenMove.startC}) -> (${chosenMove.endR}, ${chosenMove.endC}) with score ${bestScore.toFixed(1)}`);
-
-    // 4. Execute the move with animation
-    executeMove(
-        chosenMove.startR, chosenMove.startC,
-        chosenMove.endR, chosenMove.endC
+function drawPiece(piece, col, row) {
+    ctx2d.fillStyle = "#000";
+    ctx2d.font = `${SQUARE_SIZE * 0.8}px Arial`;
+    ctx2d.textAlign = "center";
+    ctx2d.textBaseline = "middle";
+    ctx2d.fillText(
+        unicodePieces[piece], 
+        col * SQUARE_SIZE + SQUARE_SIZE / 2, 
+        row * SQUARE_SIZE + SQUARE_SIZE / 2
     );
 }
 
-
-// --- Event Listeners ---
-
-function getCoordsFromEvent(event) {
-    let clientX, clientY;
-
-    // Handle touch events
-    if (event.touches && event.touches.length > 0) {
-        clientX = event.touches[0].clientX;
-        clientY = event.touches[0].clientY;
-    } 
-    // Handle mouse events
-    else {
-        clientX = event.clientX;
-        clientY = event.clientY;
-    }
-
+function handleInteraction(e) {
     const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
     
-    // Calculate scaled mouse/touch coordinates relative to the canvas element boundaries
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const canvasX = (clientX - rect.left) * scaleX;
-    const canvasY = (clientY - rect.top) * scaleY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-    // Map pixel coordinates back to board indices (0-7)
-    const col = Math.floor(canvasX / SQUARE_W);
-    const row = Math.floor(canvasY / SQUARE_H);
-    
-    return { row, col, clientX, clientY };
+    // Check if click is within the board
+    if (x >= 0 && x <= BOARD_SIZE && y >= 0 && y <= BOARD_SIZE) {
+        const col = Math.floor(x / SQUARE_SIZE);
+        const row = Math.floor(y / SQUARE_SIZE);
+
+        if (selectedSquare) {
+            // Attempt to move
+            if (selectedSquare.row === row && selectedSquare.col === col) {
+                // Deselect if clicking same square
+                selectedSquare = null;
+                statusMessage = "Select a piece to move";
+            } else {
+                // Execute move
+                const pieceToMove = board[selectedSquare.row][selectedSquare.col];
+                board[row][col] = pieceToMove;
+                board[selectedSquare.row][selectedSquare.col] = '';
+                
+                selectedSquare = null;
+                statusMessage = "Move executed!";
+            }
+        } else {
+            // Try to select a piece
+            if (board[row][col] !== '') {
+                selectedSquare = { row, col };
+                statusMessage = "Piece selected";
+            }
+        }
+        draw();
+    }
 }
 
-
-canvas.addEventListener('click', function(event) {
-    event.preventDefault();
-    const { row, col } = getCoordsFromEvent(event);
-    if (row !== null && col !== null) {
-        handleSquareClick(row, col);
-    }
-});
-
-canvas.addEventListener('touchstart', function(event) {
-    event.preventDefault(); // Prevent scrolling on touch
-    const { row, col } = getCoordsFromEvent(event);
-    if (row !== null && col !== null) {
-        handleSquareClick(row, col);
-    }
+// Event Listeners
+canvas.addEventListener('mousedown', handleInteraction);
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    handleInteraction(e);
 }, { passive: false });
 
-document.getElementById('resetBtn').addEventListener('click', () => {
-    setupBoard();
-});
-
-/**
- * Handles the logic when a square is clicked or touched.
- * @param {number} clickedR - The calculated board row.
- * @param {number} clickedC - The calculated board column.
- */
-function handleSquareClick(clickedR, clickedC) {
-    // If animation is running, ignore clicks until it finishes.
-    if (isAnimating) {
-        console.log("Ignoring click: Animation in progress.");
-        return;
-    }
-    
-    const piece = getPieceAt(clickedR, clickedC);
-
-    // 1. Attempting to move (A piece was already selected)
-    if (selectedSquare.row !== null) {
-        const startR = selectedSquare.row;
-        const startC = selectedSquare.col;
-
-        // If clicking the start square again, reset action
-        if (startR === clickedR && startC === clickedC) {
-            selectedSquare = { row: null, col: null };
-            selectedMoveTargets = [];
-            drawBoard();
-            return;
-        }
-        
-        // Execute move (This handles animation queueing and calling finalizeMoveAndSwitchTurn upon completion)
-        const moveSuccessful = executeMove(startR, startC, clickedR, clickedC);
-
-        if (!moveSuccessful) {
-            // Move failed (e.g., invalid move, or move leads to check)
-            
-            // --- Re-selection/Deselection Logic ---
-            if (piece && getPieceColor(piece) === getPieceColor('♔') && currentPlayer === 'White' && piece === getPieceAt(clickedR, clickedC)) {
-                // User clicked a different valid piece of their own color to re-select from
-                selectedSquare = { row: clickedR, col: clickedC };
-                
-                // Recalculate targets for the new piece
-                const validMoves = getValidMoves(clickedR, clickedC);
-                selectedMoveTargets = validMoves.map(move => ({ row: move.endR, col: move.endC }));
-                drawBoard();
-            } else if (!piece || getPieceColor(piece) !== getPieceColor('♔') || currentPlayer !== 'White') {
-                // Invalid click target or wrong player's turn. Reset all selection.
-                selectedSquare = { row: null, col: null };
-                selectedMoveTargets = [];
-                drawBoard();
-            } 
-            // If the click was on a valid target square, but executeMove returned false (due to check/rule violation), 
-            // we should just clear selection to prompt the user to retry or select another piece.
-            else {
-                selectedSquare = { row: null, col: null };
-                selectedMoveTargets = [];
-                drawBoard();
-            }
-        }
-    } 
-    
-    // 2. Selecting a piece (No piece selected yet)
-    else if (piece) {
-        // Check if the piece belongs to the current player AND it's the human's turn
-        if (getPieceColor(piece) === getPieceColor('♔') && currentPlayer === 'White') {
-            selectedSquare = { row: clickedR, col: clickedC };
-            
-            // Get and store targets (Only show moves that are safe)
-            const validMoves = getValidMoves(clickedR, clickedC);
-            selectedMoveTargets = validMoves.map(move => ({ row: move.endR, col: move.endC }));
-            
-            // Redraw board to show selection and targets
-            drawBoard();
-        } else {
-            // Opponent piece clicked or not White's turn
-            selectedSquare = { row: null, col: null };
-            selectedMoveTargets = [];
-            drawBoard();
-        }
-    } 
-    // 3. Clicked on empty space without anything selected
-    else {
-        selectedSquare = { row: null, col: null };
-        selectedMoveTargets = [];
-        drawBoard();
-    }
-}
-
-// --- INITIALIZATION ---
-setupBoard();
+// Initial Render
+draw();

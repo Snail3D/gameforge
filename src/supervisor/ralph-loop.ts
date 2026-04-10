@@ -173,26 +173,52 @@ export class RalphLoop extends EventEmitter {
       this.emitEvent({ type: 'step_update', ts: new Date().toISOString(), agent: 'supervisor', model, stepId: String(this.cycle + 1), status: 'passed', attempt: 1 });
     }
 
-    // Check if Builder asked Scout a question
-    const scoutMatch = /SCOUT_QUESTION:\s*(.+)/i.exec(response.content);
-    if (scoutMatch) {
-      const question = scoutMatch[1].trim();
-      this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'builder', model, content: 'Asking Scout: ' + question, tokensIn: 0, tokensOut: 0, tokPerSec: 0 });
+    // Check if Builder asked Scout a question or action
+    const scoutQuestion = /SCOUT_QUESTION:\s*(.+)/i.exec(response.content);
+    const scoutAction = /SCOUT_ACTION:\s*(.+)/i.exec(response.content);
 
+    if (scoutQuestion || scoutAction) {
       try {
-        // Take fresh screenshot after files were saved
-        const freshSs = await captureGameScreenshot(this.gameDir, this.metaDir, this.cycle);
-        if (freshSs.base64) {
+        // Parse actions if requested (e.g., "click 200 350, then click 200 250")
+        const actions: Array<{type: 'click' | 'key' | 'wait'; x?: number; y?: number; key?: string; ms?: number}> = [];
+        if (scoutAction) {
+          const actionStr = scoutAction[1].trim();
+          // Parse "click X Y" patterns
+          const clickPattern = /click\s+(\d+)\s+(\d+)/gi;
+          let clickMatch;
+          while ((clickMatch = clickPattern.exec(actionStr)) !== null) {
+            actions.push({ type: 'click', x: parseInt(clickMatch[1]), y: parseInt(clickMatch[2]) });
+          }
+          // Parse "key X" patterns
+          const keyPattern = /(?:press|key)\s+(\w+)/gi;
+          let keyMatch;
+          while ((keyMatch = keyPattern.exec(actionStr)) !== null) {
+            actions.push({ type: 'key', key: keyMatch[1] });
+          }
+          this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'builder', model, content: 'Scout action: ' + actionStr + ' (' + actions.length + ' actions)', tokensIn: 0, tokensOut: 0, tokPerSec: 0 });
+        }
+
+        // Import testGame with actions
+        const { testGame } = await import('../testing/game-runner.js');
+        const screenshotDir = join(this.metaDir, 'screenshots');
+        mkdirSync(screenshotDir, { recursive: true });
+        const result = await testGame(this.gameDir, screenshotDir, this.cycle + 1000, actions.length > 0 ? actions : undefined);
+
+        if (result.screenshotBase64) {
+          const question = scoutQuestion ? scoutQuestion[1].trim() : 'Describe what happened after the actions were performed. What changed on screen?';
           const visionClient = new LLMClient({ baseUrl: this.config.ollama.host, model: 'gemma4:e4b' });
           const answer = await visionClient.chat(
             visionClient.buildMessages(
-              'You are a visual QA tester looking at a game screenshot. Answer the developer\'s question honestly and specifically. If something is wrong, say exactly what and where.',
+              'You are a QA tester playing a game. Look at the screenshot CAREFULLY. Answer honestly — if you cannot see something clearly, say so. Do NOT make up details. Only describe what you ACTUALLY see.',
               question,
               undefined,
-              [{ base64: freshSs.base64, mimeType: 'image/png' }]
+              [{ base64: result.screenshotBase64, mimeType: 'image/png' }]
             )
           );
-          this.lastScoutAnswer = '\n\nSCOUT ANSWER (from last cycle): Q: ' + question + '\nA: ' + answer.content;
+          this.lastScoutAnswer = '\n\nSCOUT ANSWER: Q: ' + question + (actions.length > 0 ? ' (after ' + actions.length + ' actions)' : '') + '\nA: ' + answer.content;
+          if (result.consoleErrors.length > 0) {
+            this.lastScoutAnswer += '\nConsole errors: ' + result.consoleErrors.join('; ');
+          }
           this.emitEvent({ type: 'message', ts: new Date().toISOString(), agent: 'scout', model: 'gemma4:e4b', content: 'Answer: ' + answer.content.substring(0, 300), tokensIn: answer.tokensIn, tokensOut: answer.tokensOut, tokPerSec: answer.tokensOut / (answer.durationMs / 1000) });
         }
       } catch { this.lastScoutAnswer = ''; }
